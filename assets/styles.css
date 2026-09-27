@@ -83,6 +83,7 @@
 .website-audiences{background:#f4f7fb}.website-audiences .value-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.website-audiences-cta{margin:38px 0 0}@media(max-width:900px){.website-audiences .value-grid{grid-template-columns:1fr}}
 
 /* About page team */
+.team-card:nth-child(3) img{object-position:center 20%}.team-card:nth-child(4) img{object-position:center 30%}
 .team-section{background:#f4f7fb}.team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;max-width:720px;margin-inline:auto}.team-card{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 18px 44px rgba(7,24,43,.06)}.team-card img{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;background:#fff}.team-card-copy{padding:25px 28px 30px}.team-card h3{margin:0;font-size:1.55rem}.team-card-copy p{margin:10px 0 0;color:var(--muted)}.team-card-copy .team-role{color:var(--blue);font-weight:700;font-size:.92rem}@media(max-width:650px){.team-grid{grid-template-columns:1fr;max-width:340px}.team-card-copy{padding:22px}}
 
 /* Website proposal */
