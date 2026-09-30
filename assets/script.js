@@ -50,3 +50,8 @@ if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
   },{threshold:.08,rootMargin:'0px 0px -45px'});
   revealItems.forEach(item=>revealObserver.observe(item));
 }
+
+// Select the service requested from a quotation button.
+const requestedService=new URLSearchParams(window.location.search).get('service');
+const serviceSelect=document.querySelector('#contact-form select[name="service"]');
+if(requestedService&&serviceSelect&&[...serviceSelect.options].some(option=>option.value===requestedService)) serviceSelect.value=requestedService;

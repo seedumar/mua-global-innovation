@@ -88,3 +88,5 @@
 
 /* Website proposal */
 .proposal-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.proposal-steps article{padding:26px;border:1px solid var(--line);border-radius:14px;background:#fff}.proposal-steps b{color:var(--blue);font:800 1rem var(--display)}.proposal-steps h3{margin:24px 0 8px;font-size:1.25rem}.proposal-steps p,.proposal-request p{color:var(--muted)}.proposal-request{background:var(--soft)}.proposal-request h2{font-size:clamp(2.1rem,3.5vw,3.5rem)}.proposal-small{font-size:.9rem}@media(max-width:900px){.proposal-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.proposal-steps{grid-template-columns:1fr}}
+
+.service-quote{margin-top:24px}.solution-detail[id]{scroll-margin-top:120px}
