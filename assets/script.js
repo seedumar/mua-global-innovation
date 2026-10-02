@@ -22,8 +22,10 @@ document.addEventListener('keydown',event=>{
 window.addEventListener('scroll',()=>header.classList.toggle('scrolled',window.scrollY>24),{passive:true});
 
 const sections=[...document.querySelectorAll('main section[id]')];
+if ('IntersectionObserver' in window) {
 const observer=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(entry.isIntersecting){links.forEach(link=>link.classList.toggle('active',link.getAttribute('href')==='#'+entry.target.id));}})},{rootMargin:'-35% 0px -55%',threshold:0});
 sections.forEach(section=>observer.observe(section));
+}
 
 document.querySelector('#contact-form')?.addEventListener('submit',event=>{
   event.preventDefault();
@@ -52,7 +54,7 @@ document.querySelectorAll('.footer-bottom a[href="#top"], .footer-bottom a[href=
   });
 });
 
-if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+if('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
   const revealItems=[...document.querySelectorAll('main section > .container, .service-card, .value-grid article, .solution-detail, .venture-principles article')];
   revealItems.forEach(item=>item.classList.add('reveal-ready'));
   const revealObserver=new IntersectionObserver(entries=>{

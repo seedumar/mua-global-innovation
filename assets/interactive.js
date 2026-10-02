@@ -41,7 +41,7 @@
   project.before(fields);
   function update() {
     const value = select.value;
-    const entry = Object.values(services).find(service => service.enquiry === value)
+    const entry = (value === 'MUA Trust Homes' ? { question: 'Your role:', options: ['Tenant', 'Landlord', 'Agent', 'Property company'], second: 'Where are you interested in property?', choices: ['Kano', 'Another location', 'Exploring partnerships'] } : null) || Object.values(services).find(service => service.enquiry === value)
       || (/website/i.test(value) ? services.websites : (value ? { question: 'What stage is your project at?', options: ['Exploring an idea', 'Ready to start', 'Improving something existing'], second: 'Who will it support?', choices: ['A school', 'A business', 'An organisation', 'Individuals'] } : null));
     fields.replaceChildren(); fields.hidden = !entry;
     if (!entry) return;
@@ -56,4 +56,7 @@
     });
   }
   select.addEventListener('change', update); update();
+  const requestedRole = new URLSearchParams(window.location.search).get('role');
+  const roleField = fields.querySelector('select[name="detail_1"]');
+  if (select.value === 'MUA Trust Homes' && roleField && [...roleField.options].some(option => option.value === requestedRole)) roleField.value = requestedRole;
 })();
