@@ -83,8 +83,32 @@
 .website-audiences{background:#f4f7fb}.website-audiences .value-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.website-audiences-cta{margin:38px 0 0}@media(max-width:900px){.website-audiences .value-grid{grid-template-columns:1fr}}
 
 /* About page team */
-.team-card:nth-child(4) img{object-position:center 30%}
-.team-section{background:#f4f7fb}.team-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;max-width:1180px;margin-inline:auto}.team-card{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 18px 44px rgba(7,24,43,.06)}.team-card img{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;background:#fff}.team-card-copy{padding:23px 22px 27px}.team-card h3{margin:0;font-size:1.28rem;line-height:1.3}.team-card-copy p{margin:10px 0 0;color:var(--muted)}.team-card-copy .team-role{color:var(--blue);font-weight:700;font-size:.92rem}@media(max-width:900px){.team-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-width:720px}}@media(max-width:650px){.team-grid{grid-template-columns:1fr;max-width:340px}.team-card-copy{padding:22px}}
+/* Faces behind MUA: executive triangle and growth team. */
+.team-section{background:linear-gradient(180deg,#f5f8fc 0%,#eef4fa 62%,#f8fafc 100%);position:relative;isolation:isolate}
+.team-intro{text-align:center;max-width:720px;margin:0 auto 48px}
+.team-intro h2{margin:12px 0 18px;letter-spacing:-.045em}.team-intro h2 span{color:var(--blue)}
+.team-intro>p:last-child{color:var(--muted);max-width:600px;margin:0 auto;font-size:1.06rem}
+.team-tier-heading{display:flex;align-items:center;justify-content:center;gap:12px;margin:0 auto 28px;color:var(--navy)}
+.team-tier-heading>span{display:grid;place-items:center;width:32px;height:32px;background:#e1ecfa;border:1px solid #ccddf3;border-radius:50%;font-size:.72rem;font-weight:800;color:#185db2}
+.team-tier-heading h3{margin:0;font:700 .9rem var(--display);letter-spacing:.02em}
+.team-leadership{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px;max-width:720px;margin:0 auto}
+.team-ceo{grid-column:2/span 2}.team-coo{grid-column:1/span 2}.team-cfo{grid-column:3/span 2}
+.team-growth-heading{margin-top:56px}.team-growth{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;max-width:1094px;margin:0 auto}
+.team-card{position:relative;overflow:hidden;min-width:0;border:1px solid #dae4ef;border-radius:24px;background:#fff;box-shadow:0 10px 32px rgba(7,24,43,.055);transition:transform .25s ease,box-shadow .25s ease}
+.team-card:before{content:"";position:absolute;inset:0 28px auto;height:3px;background:linear-gradient(90deg,var(--blue),var(--green));z-index:1;border-radius:0 0 5px 5px}
+.team-portrait{padding:18px 18px 0;background:#fff}
+.team-card .team-portrait img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:cover;object-position:center 18%;border-radius:14px;background:#fff}
+.team-bdo .team-portrait img{object-position:center 30%}
+.team-card-copy{padding:23px 24px 28px;text-align:center}
+.team-card h3{margin:0;font:800 1.3rem/1.28 var(--display);letter-spacing:-.025em;color:var(--navy);overflow-wrap:anywhere}
+.team-card-copy .team-role{margin:12px 0 0;font-size:.86rem;line-height:1.5;color:#1764bb;font-weight:700;min-height:2.6em}
+.team-card-copy .team-bio{margin:16px 0 0;padding-top:16px;border-top:1px solid #e8eef5;color:var(--muted);font-size:.9rem;line-height:1.7}
+.team-distinction{display:inline-block;margin:0 0 14px;padding:5px 12px;border:1px solid #c9eadf;border-radius:99px;background:#edf9f4;color:#146a4d;font-weight:700;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase}
+.team-ceo{border-color:#b8d5f8;box-shadow:0 16px 42px rgba(23,120,242,.10)}
+@media(hover:hover) and (prefers-reduced-motion:no-preference){.team-card:hover{transform:translateY(-5px);box-shadow:0 20px 45px rgba(7,24,43,.10)}}
+@media(max-width:900px){.team-growth{gap:18px}.team-growth .team-card-copy{padding:20px 16px 24px}.team-growth .team-portrait{padding:12px 12px 0}.team-growth .team-card h3{font-size:1.14rem}}
+@media(max-width:650px){.team-leadership,.team-growth{display:grid;grid-template-columns:1fr;max-width:370px;gap:24px}.team-ceo,.team-coo,.team-cfo{grid-column:auto}.team-intro{margin-bottom:32px}.team-intro>p:last-child{font-size:.98rem}.team-tier-heading{gap:9px}.team-tier-heading h3{font-size:.8rem}.team-growth-heading{margin-top:40px}.team-growth .team-card-copy{padding:23px 24px 28px}.team-growth .team-portrait{padding:18px 18px 0}.team-growth .team-card h3{font-size:1.3rem}}
+
 
 /* Website proposal */
 .proposal-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.proposal-steps article{padding:26px;border:1px solid var(--line);border-radius:14px;background:#fff}.proposal-steps b{color:var(--blue);font:800 1rem var(--display)}.proposal-steps h3{margin:24px 0 8px;font-size:1.25rem}.proposal-steps p,.proposal-request p{color:var(--muted)}.proposal-request{background:var(--soft)}.proposal-request h2{font-size:clamp(2.1rem,3.5vw,3.5rem)}.proposal-small{font-size:.9rem}@media(max-width:900px){.proposal-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.proposal-steps{grid-template-columns:1fr}}
