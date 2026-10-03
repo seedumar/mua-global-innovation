@@ -9,3 +9,5 @@
 .lead-contact{margin:5px 0;font-size:.83rem;overflow-wrap:anywhere}#lead-list small{display:block}#lead-list td{max-width:350px;overflow-wrap:anywhere}.follow-up-due{display:block;width:fit-content;margin-top:7px;background:#fff0dc;color:#9c5b16}.badge.won{background:#dff7ed;color:#116943}.badge.lost{background:#fce7e7;color:#9d2525}.badge.interested{background:#e2eeff;color:#1257ae}#lead-list .outline{white-space:nowrap}
 
 .report-sort{max-width:280px}#performance-list small{display:block;overflow-wrap:anywhere}#performance-list .outline{white-space:nowrap}#performance-list td:nth-child(n+3):nth-child(-n+7){font-variant-numeric:tabular-nums}
+
+#project-list small{display:block}#project-list td{max-width:300px;overflow-wrap:anywhere}#project-list .outline{white-space:nowrap}#project-stats .stat strong{font-size:clamp(1rem,1.7vw,1.6rem);overflow-wrap:anywhere}.payment-summary{padding:12px 16px;background:#eaf3ff;border-radius:8px;font-size:.9rem}.badge.completed{background:#dff7ed;color:#116943}.badge.client_review{background:#fff0dc;color:#9c5b16}.badge.in_progress{background:#e2eeff;color:#1257ae}

@@ -1,0 +1,45 @@
+-- Optional verification after project-delivery.sql. All test records roll back.
+begin;
+do $$
+declare adm uuid:=gen_random_uuid(); amb uuid:=gen_random_uuid(); p uuid; stamp timestamptz; visible integer; denied boolean;
+begin
+ insert into auth.users(id,email) values(adm,adm::text||'@delivery-test.invalid'),(amb,amb::text||'@delivery-test.invalid');
+ update public.portal_profiles set active=true where id in(adm,amb);
+ update public.portal_profiles set role='admin' where id=adm;
+ perform set_config('request.jwt.claim.sub',adm::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',adm,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ p:=public.portal_save_project(null,null,'Test client','Website','Developer',current_date,'not_started',150000,90000,'Deposit confirmed','Test notes');
+ select updated_at into stamp from public.portal_projects where id=p;
+ perform public.portal_save_project(p,stamp,'Test client','Website','Developer',current_date,'in_progress',150000,90000,'Deposit confirmed','Started');
+ denied:=false;
+ begin perform public.portal_save_project(p,stamp,'Test client','Website','Developer',current_date,'completed',150000,150000,'','Stale update'); exception when others then if sqlerrm like 'This project changed%' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: stale update accepted.'; end if;
+ denied:=false;
+ begin perform public.portal_save_project(null,null,'Bad quote','Website','',null,'not_started',100,200,'',''); exception when check_violation then denied:=true; end;
+ if not denied then raise exception 'FAIL: overpayment accepted.'; end if;
+ execute 'reset role';
+ perform set_config('request.jwt.claim.sub',amb::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',amb,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ select count(*) into visible from public.portal_projects where id=p;
+ if visible<>0 then raise exception 'FAIL: ambassador read project finances.'; end if;
+ denied:=false;
+ begin perform public.portal_save_project(null,null,'Ambassador','Website','',null,'not_started',100,0,'',''); exception when others then if sqlerrm='Admin access required.' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: ambassador created project.'; end if;
+ update public.portal_projects set amount_received=100 where id=p;
+ execute 'reset role';
+ if (select amount_received from public.portal_projects where id=p)<>90000 then raise exception 'FAIL: ambassador edited payment.'; end if;
+ update public.portal_profiles set active=false where id=adm;
+ perform set_config('request.jwt.claim.sub',adm::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',adm,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ select count(*) into visible from public.portal_projects where id=p;
+ if visible<>0 then raise exception 'FAIL: inactive admin read project.'; end if;
+ denied:=false;
+ begin perform public.portal_save_project(null,null,'Inactive','Website','',null,'not_started',100,0,'',''); exception when others then if sqlerrm='Admin access required.' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: inactive admin created project.'; end if;
+ execute 'reset role';
+ raise notice 'PASS: active admin access, ambassador exclusion, deactivation, payment bounds and stale-edit protection.';
+end $$;
+rollback;

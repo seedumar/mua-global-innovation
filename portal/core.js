@@ -15,6 +15,20 @@ export function lagosToday(now = new Date()) {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 export function leadDue(lead, today = lagosToday()) { return !!lead.follow_up_date && !['won','lost'].includes(lead.stage) && lead.follow_up_date <= today; }
+export const projectStatuses = { not_started: 'Not started', in_progress: 'In progress', client_review: 'Client review', completed: 'Completed' };
+export function projectOverdue(project, today = lagosToday()) { return !!project.deadline && project.status !== 'completed' && project.deadline < today; }
+export function projectBalance(total, received) { return (Math.round(Number(total)*100)-Math.round(Number(received)*100))/100; }
+export function validateProject(data) {
+  for (const field of ['client_name','service_name']) if (!data[field]?.trim() || data[field].length > 200) throw new Error('Enter a client and service name of up to 200 characters.');
+  if (!Object.hasOwn(projectStatuses,data.status)) throw new Error('Choose a project status.');
+  for (const [field,limit] of [['assigned_to',200],['payment_notes',2000],['notes',5000]]) if ((data[field] || '').length>limit) throw new Error('Keep '+field.replaceAll('_',' ')+' within '+limit+' characters.');
+  for (const field of ['total_cost','amount_received']) {
+    if (data[field] == null || data[field] === '' || !Number.isFinite(Number(data[field])) || Number(data[field])<0 || Number(data[field])>999999999 || Math.abs(Number(data[field])*100-Math.round(Number(data[field])*100))>0.00001) throw new Error('Enter valid amounts in NGN with up to two decimal places.');
+  }
+  if (projectBalance(data.total_cost,data.amount_received)<0) throw new Error('Confirmed payments cannot exceed the project cost.');
+  if (data.deadline && (!/^\d{4}-\d{2}-\d{2}$/.test(data.deadline) || !Number.isFinite(Date.parse(data.deadline)) || new Date(data.deadline).toISOString().slice(0,10)!==data.deadline)) throw new Error('Choose a valid deadline.');
+  return data;
+}
 export function ambassadorPerformance(members, leads, proposals, today = lagosToday()) {
   return members.filter(member => member.role === 'ambassador').map(member => {
     const owned = leads.filter(lead => lead.owner_id === member.id);

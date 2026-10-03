@@ -53,6 +53,7 @@ export class PortalAPI {
   rpc(name, args) { return this.request('/rest/v1/rpc/' + name, { method: 'POST', body: args }); }
   proposals() { return this.request('/rest/v1/portal_proposals?select=*&order=updated_at.desc'); }
   leads() { return this.request('/rest/v1/portal_leads?select=*&order=updated_at.desc'); }
+  projects() { return this.request('/rest/v1/portal_projects?select=*&order=updated_at.desc'); }
   services() { return this.request('/rest/v1/portal_services?select=*&order=name.asc'); }
   profiles() { return this.request('/rest/v1/portal_profiles?select=*&order=created_at.desc'); }
   events(id) { return this.request('/rest/v1/portal_events?proposal_id=eq.' + encodeURIComponent(id) + '&select=*&order=created_at.asc'); }

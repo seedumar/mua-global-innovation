@@ -138,3 +138,14 @@ The portal keeps proposal features available if the outreach table has not yet b
 Replace the portal folder and hard refresh to add Performance reports in the admin dashboard. No additional SQL is required once the outreach tracker is installed. Reports use all-time ambassador-owned leads and proposals, including inactive ambassadors; admin-owned records are excluded. Search, access filters and sorting update the report, and summary cards reflect the filtered ambassadors. View leads opens outreach filtered to that ambassador.
 
 Conversion means leads currently marked Won divided by all leads belonging to the ambassador; ambassadors with no leads show a dash. Won counts depend on the manually recorded lead stage and do not confirm revenue or payment. If outreach cannot load, its metrics show dashes rather than misleading zero counts; proposal counts remain available.
+
+
+## Enable project delivery (existing portal)
+
+1. In Supabase SQL Editor, run `backend/project-delivery.sql`. This adds an admin-only project table and save function. It can be rerun safely. Do not rerun `schema.sql`.
+2. Replace the portal folder on GitHub and hard refresh. Sign in as an active admin and open Project delivery. Ambassadors cannot view or change delivery or payment records. Assigned team member is a name for coordination; it does not grant portal access.
+3. Add the client, service, assigned team member, deadline, total cost and cumulative confirmed payments received. Record payment references and dates in Payment notes. Check bank records before recording a payment. The 60% deposit is a suggested expected amount, never automatically recorded as received.
+4. Update progress from Not started to In progress, Client review and Completed. The balance equals cost minus confirmed received payments. Completed projects can still have an outstanding balance. Overdue means an unfinished project with a deadline before today in Nigerian time.
+5. Approved proposal details provide Create delivery project, which copies the client, service, quoted amount and proposal reference. Check for an existing project first. Delivery progress is independent of the outreach lead stage.
+
+Saving a stale project version is rejected; refresh and reopen before re-entering changes. Proposal/outreach features remain available if delivery is not yet installed. Optional live verification: run `backend/project-permission-tests.sql`; test users and projects roll back. Local unit and UI checks do not substitute for installing and verifying the policies in your Supabase project.

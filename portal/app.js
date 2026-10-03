@@ -1,8 +1,8 @@
-import { PortalAPI } from './api.js?v=20261003-outreach';
-import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance } from './core.js?v=20261003-performance';
+import { PortalAPI } from './api.js?v=20261003-delivery';
+import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance, projectStatuses, projectOverdue, projectBalance, validateProject } from './core.js?v=20261003-delivery';
 const api = new PortalAPI(window.MUA_PORTAL_CONFIG || {});
 const $ = selector => document.querySelector(selector);
-let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '';
+let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '', projects = [], projectError = '';
 const adminArea = document.body.dataset.area === 'admin';
 function element(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
 function notify(message) { clearTimeout(noticeTimer); $('#notice').textContent = message; $('#notice').hidden = false; noticeTimer = setTimeout(() => { $('#notice').hidden = true; }, 6500); }
@@ -20,9 +20,9 @@ function button(text, callback, cls = 'outline') { const node = element('button'
 function badge(status) { return element('span', statuses[status] || status, 'badge ' + status); }
 function showView(name) {
   if (!adminArea && !['proposals','leads'].includes(name)) return;
-  ['proposals', 'leads', 'members', 'services', 'performance'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
+  ['proposals', 'leads', 'members', 'services', 'performance', 'projects'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
   document.querySelectorAll('[data-view]').forEach(node => { node.classList.toggle('active', node.dataset.view === name); if (node.dataset.view === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
-  $('#dashboard-title').textContent = name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
+  $('#dashboard-title').textContent = name === 'projects' ? 'Project delivery.' : name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
 }
 function renderProposals() {
   const stats = $('#stats'); stats.replaceChildren();
@@ -93,6 +93,42 @@ function renderPerformance() {
     }); view.disabled = !!leadError; actions.append(view); row.append(actions); list.append(row);
   }
 }
+function renderProjects() {
+  if (!adminArea) return;
+  const search = $('#project-search').value.trim().toLowerCase(), status = $('#project-status-filter').value, overdue = $('#project-overdue-filter').checked;
+  const rows = projects.filter(project => (!status || project.status === status) && (!overdue || projectOverdue(project)) && (!search || [project.client_name,project.service_name,project.assigned_to].join(' ').toLowerCase().includes(search)))
+    .sort((a,b) => Number(projectOverdue(b))-Number(projectOverdue(a)) || (a.deadline || '9999').localeCompare(b.deadline || '9999') || b.updated_at.localeCompare(a.updated_at));
+  $('#project-error').hidden = !projectError; $('#project-error').textContent = projectError; $('#new-project').disabled = !!projectError;
+  const stats = $('#project-stats'); stats.replaceChildren();
+  const sumKobo = key => rows.reduce((total,project) => total+Math.round(Number(project[key])*100),0);
+  for (const [label,value] of [['Active projects',rows.filter(project => project.status !== 'completed').length],['Overdue',rows.filter(project => projectOverdue(project)).length],['Confirmed payments',money(sumKobo('amount_received')/100)],['Outstanding balance',money((sumKobo('total_cost')-sumKobo('amount_received'))/100)]]) {
+    const card = element('div',undefined,'stat'); card.append(element('strong',projectError ? '—' : String(value)),element('span',label)); stats.append(card);
+  }
+  const list = $('#project-list'); list.replaceChildren(); $('#empty-projects').hidden = !!projectError || rows.length > 0;
+  for (const project of rows) {
+    const row = element('tr'), client = element('td'); client.append(element('strong',project.client_name),element('small',project.service_name));
+    const statusCell = element('td'); statusCell.append(element('span',projectStatuses[project.status],'badge '+project.status));
+    const deadline = element('td',project.deadline ? date(project.deadline+'T12:00:00+01:00') : 'Not set');
+    if (projectOverdue(project)) deadline.append(element('span','Overdue','badge follow-up-due'));
+    const amounts = element('td'); amounts.append(element('div','Cost: '+money(project.total_cost)),element('div','Received: '+money(project.amount_received)),element('strong','Balance: '+money(projectBalance(project.total_cost,project.amount_received))));
+    const actions = element('td'); actions.append(button('View / Update',()=>openProjectEditor(project))); row.append(client,element('td',project.assigned_to || 'Unassigned'),statusCell,deadline,amounts,actions); list.append(row);
+  }
+}
+function updateProjectPaymentSummary() {
+  const form = $('#delivery-form'), summary = $('#project-payment-summary'), total = form.elements.total_cost.value, received = form.elements.amount_received.value;
+  if (total === '' || received === '') { summary.textContent = 'Enter the project cost and confirmed payments to calculate the balance.'; return; }
+  const breakdown = paymentBreakdown(total), balance = projectBalance(total,received);
+  summary.textContent = !breakdown || !Number.isFinite(balance) || Number(received)<0 || balance<0 ? 'Enter valid amounts. Confirmed payments must not exceed the cost.' : 'Expected deposit (60%): '+money(breakdown.deposit)+' · Confirmed received: '+money(received)+' · Outstanding: '+money(balance);
+}
+function openProjectEditor(project, proposal) {
+  if (!adminArea) return;
+  if (projectError) { notify(projectError); return; }
+  const form = $('#delivery-form'); form.reset(); form.querySelector('.form-message').textContent = '';
+  $('#project-editor-title').textContent = project ? 'Update project delivery.' : 'Add a project.';
+  if (project) { for (const field of ['id','client_name','service_name','assigned_to','deadline','status','total_cost','amount_received','payment_notes','notes']) form.elements[field].value = project[field] ?? ''; form.elements.expected_updated_at.value = project.updated_at; }
+  if (proposal) { form.elements.client_name.value = proposal.client_name; form.elements.service_name.value = proposal.service_name; form.elements.total_cost.value = proposal.amount ?? ''; form.elements.notes.value = 'Proposal reference: '+proposal.reference; }
+  updateProjectPaymentSummary(); $('#project-dialog').showModal();
+}
 function renderMembers() {
   const list = $('#member-list'); list.replaceChildren();
   for (const member of members.filter(m => m.role === 'ambassador')) {
@@ -125,7 +161,9 @@ async function loadData() {
     for (const member of members) { const option = element('option',member.full_name || member.email); option.value = member.id; select.append(option); }
     select.value = members.some(member => member.id === chosen) ? chosen : '';
   }
-  renderLeads(); renderProposals(); if (adminArea) { renderMembers(); renderServices(); renderPerformance(); }
+  renderLeads(); renderProposals(); if (adminArea) { renderMembers(); renderServices(); renderPerformance();
+    try { projects = await api.projects(); projectError = ''; } catch (error) { projects = []; projectError = 'Project delivery is unavailable. If this is your first update, run project-delivery.sql in Supabase and refresh. Otherwise, check your connection and retry.'; }
+    renderProjects(); }
 }
 async function openWorkspace() {
   await loadData();
@@ -197,6 +235,7 @@ async function openDetail(id) {
     $('#print-letter').replaceChildren(buildLetter(latest));
     $('#detail-dialog').close(); window.print();
   }, 'primary'));
+  if (adminArea && canPrint(p)) actions.append(button('Create delivery project', () => { $('#detail-dialog').close(); openProjectEditor(null,p); }));
   actions.append(button('Add to client outreach', () => { $('#detail-dialog').close(); openLeadEditor(null, p); }));
   const review = $('#review-form'); review.hidden = !(adminArea && p.status === 'submitted'); review.reset(); review.querySelector('.form-message').textContent = '';
   review.elements.letter_text.value = p.letter_text; review.elements.amount.value = p.amount ?? ''; review.elements.feedback.value = p.feedback || '';
@@ -220,6 +259,16 @@ $('#login-form').addEventListener('submit', event => { event.preventDefault(); c
 $('#forgot-password').addEventListener('click', () => action(async () => { const email = $('#login-form').elements.email; if (!email.reportValidity()) return; await api.recover(email.value.trim()); notify('If this email has an account, a password-reset link will be sent.'); }, $('#login-form')));
 $('#sign-out').addEventListener('click', () => action(async () => { await api.signOut(); location.reload(); }, null, $('#sign-out')));
 $('#refresh').addEventListener('click', () => action(async () => { await loadData(); notify('Dashboard updated.'); }, null, $('#refresh')));
+if (adminArea) {
+  $('#new-project').addEventListener('click',()=>openProjectEditor());
+  $('#project-search').addEventListener('input',renderProjects); $('#project-status-filter').addEventListener('change',renderProjects); $('#project-overdue-filter').addEventListener('change',renderProjects);
+  for (const field of ['total_cost','amount_received']) $('#delivery-form').elements[field].addEventListener('input',updateProjectPaymentSummary);
+  $('#delivery-form').addEventListener('submit',event=>{ event.preventDefault(); const form=event.currentTarget; action(async()=>{
+    const data=validateProject(Object.fromEntries(new FormData(form)));
+    await api.rpc('portal_save_project',{p_id:data.id || null,p_expected_updated_at:data.expected_updated_at || null,p_client_name:data.client_name,p_service_name:data.service_name,p_assigned_to:data.assigned_to,p_deadline:data.deadline || null,p_status:data.status,p_total_cost:Number(data.total_cost),p_amount_received:Number(data.amount_received),p_payment_notes:data.payment_notes,p_notes:data.notes});
+    $('#project-dialog').close(); await loadData(); showView('projects'); notify('Project delivery updated.');
+  },form); });
+}
 $('#new-lead').addEventListener('click', () => openLeadEditor());
 $('#lead-owner-filter').addEventListener('change', renderLeads);
 if (adminArea) { $('#performance-search').addEventListener('input', renderPerformance); $('#performance-access').addEventListener('change', renderPerformance); $('#performance-sort').addEventListener('change', renderPerformance); }
