@@ -1,0 +1,53 @@
+-- Optional verification after outreach-tracker.sql. Test records are rolled back.
+begin;
+do $$
+declare
+ a uuid:=gen_random_uuid(); b uuid:=gen_random_uuid(); adm uuid:=gen_random_uuid();
+ lead uuid; visible integer; denied boolean;
+begin
+ insert into auth.users(id,email) values(a,a::text||'@outreach-test.invalid'),(b,b::text||'@outreach-test.invalid'),(adm,adm::text||'@outreach-test.invalid');
+ update public.portal_profiles set active=true where id in(a,b,adm);
+ update public.portal_profiles set role='admin' where id=adm;
+ perform set_config('request.jwt.claim.sub',a::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',a,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ lead:=public.portal_save_lead(null,'Test company','Contact','08000000000','Address','new',current_date,'Notes');
+ perform public.portal_save_lead(lead,'Test company','Contact','','Address','contacted',current_date,'Updated notes');
+ select count(*) into visible from public.portal_leads where id=lead;
+ if visible<>1 then raise exception 'FAIL: owner cannot read lead.'; end if;
+ execute 'reset role';
+ perform set_config('request.jwt.claim.sub',b::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',b,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ select count(*) into visible from public.portal_leads where id=lead;
+ if visible<>0 then raise exception 'FAIL: other ambassador read lead.'; end if;
+ denied:=false;
+ begin perform public.portal_save_lead(lead,'Hijack','','','','won',null,''); exception when others then if sqlerrm='Lead unavailable.' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: other ambassador edited lead.'; end if;
+ denied:=false;
+ begin insert into public.portal_leads(owner_id,company_name) values(a,'Wrong owner'); exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'FAIL: ambassador assigned another owner.'; end if;
+ execute 'reset role';
+ perform set_config('request.jwt.claim.sub',adm::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',adm,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ select count(*) into visible from public.portal_leads where id=lead;
+ if visible<>1 then raise exception 'FAIL: admin cannot read lead.'; end if;
+ perform public.portal_save_lead(lead,'Test company','Contact','','Address','interested',current_date,'Admin follow-up');
+ denied:=false;
+ begin update public.portal_leads set owner_id=adm where id=lead; exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'FAIL: owner can be reassigned directly.'; end if;
+ execute 'reset role';
+ update public.portal_profiles set active=false where id=a;
+ perform set_config('request.jwt.claim.sub',a::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',a,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ select count(*) into visible from public.portal_leads where id=lead;
+ if visible<>0 then raise exception 'FAIL: inactive account read lead.'; end if;
+ denied:=false;
+ begin perform public.portal_save_lead(null,'Inactive','','','','new',null,''); exception when others then if sqlerrm='Your account is not active.' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: inactive account created lead.'; end if;
+ execute 'reset role';
+ raise notice 'PASS: owner access, cross-account isolation, admin updates, fixed ownership and deactivation.';
+end $$;
+rollback;

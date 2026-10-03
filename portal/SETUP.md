@@ -120,3 +120,14 @@ Database integration, invitation email delivery and visual browser review have n
 Enter the total project cost in the admin review before approving the proposal. The letter includes the selected service, total cost, a 60% deposit, and a 40% remaining balance. Calculations use kobo rounding so the deposit and balance add up to the total. If no price is entered, the letter states that the project cost is to be agreed; it does not show a zero-price quote.
 
 Payment details: Moniepoint; account name Mua Global Innovation Ltd; account number 6520592152. These company details and the 60/40 split are applied when viewing or printing letters, including existing proposals. Replace the portal folder to deploy this update; no database migration is required.
+
+
+## Enable the client outreach tracker (existing portal)
+
+1. Open Supabase → SQL Editor → New query. Paste the full contents of `backend/outreach-tracker.sql` and run it. This adds a new table and its access rules; existing proposals and accounts remain intact. Do not rerun `backend/schema.sql`. The outreach script can be rerun if needed.
+2. Replace the complete `portal` folder on GitHub with this version. Refresh your browser with Ctrl+Shift+R. No Edge Function or authentication settings need changing.
+3. Sign in and open Client outreach. Add a company, contact details, progress stage, follow-up date and conversation notes.
+4. Ambassadors see and update their own leads. Admins see and update all leads. Inactive accounts have no access. Follow-ups due today and overdue are highlighted using Nigerian time; Won and Lost leads are excluded from reminders. These are dashboard reminders, not email notifications.
+5. The proposal details panel has an Add to client outreach button that copies the recipient details and proposal reference into a new lead. Check for an existing company before adding it again. Creating or approving a proposal does not automatically change lead progress.
+
+The portal keeps proposal features available if the outreach table has not yet been installed, and shows a setup message in Client outreach. Optional database verification: run `backend/outreach-permission-tests.sql`; its temporary users and records are rolled back. Live database verification must be completed in your Supabase project after installation.

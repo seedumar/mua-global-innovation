@@ -1,4 +1,20 @@
 export const statuses = { draft: 'Draft', submitted: 'Awaiting review', changes_requested: 'Changes requested', approved: 'Approved' };
+export const leadStages = { new: 'New lead', contacted: 'Contacted', proposal_sent: 'Proposal sent', interested: 'Interested', won: 'Won', lost: 'Lost' };
+export function validateLead(data) {
+  if (!data.company_name?.trim() || data.company_name.length > 200) throw new Error('Enter a company name of up to 200 characters.');
+  if (!Object.hasOwn(leadStages, data.stage)) throw new Error('Choose a lead stage.');
+  for (const [field, limit] of [['contact_name',200],['contact_details',500],['client_address',1000],['notes',5000]]) {
+    if ((data[field] || '').length > limit) throw new Error('Keep ' + field.replaceAll('_',' ') + ' within ' + limit + ' characters.');
+  }
+  if (data.follow_up_date && (!/^\d{4}-\d{2}-\d{2}$/.test(data.follow_up_date) || !Number.isFinite(Date.parse(data.follow_up_date)) || new Date(data.follow_up_date).toISOString().slice(0,10) !== data.follow_up_date)) throw new Error('Choose a valid follow-up date.');
+  return data;
+}
+export function lagosToday(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', year:'numeric',month:'2-digit',day:'2-digit' }).formatToParts(now);
+  const value = type => parts.find(p => p.type === type).value;
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+export function leadDue(lead, today = lagosToday()) { return !!lead.follow_up_date && !['won','lost'].includes(lead.stage) && lead.follow_up_date <= today; }
 export function validateBrief(data) {
   if (!data.service_id) throw new Error('Choose a service.');
   if (!data.client_name?.trim() || data.client_name.length > 200) throw new Error('Enter a recipient name of up to 200 characters.');

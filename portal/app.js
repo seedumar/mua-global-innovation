@@ -1,8 +1,8 @@
-import { PortalAPI } from './api.js';
-import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference } from './core.js?v=20261003-payment';
+import { PortalAPI } from './api.js?v=20261003-outreach';
+import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue } from './core.js?v=20261003-outreach';
 const api = new PortalAPI(window.MUA_PORTAL_CONFIG || {});
 const $ = selector => document.querySelector(selector);
-let profile, proposals = [], services = [], members = [], current, noticeTimer;
+let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '';
 const adminArea = document.body.dataset.area === 'admin';
 function element(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
 function notify(message) { clearTimeout(noticeTimer); $('#notice').textContent = message; $('#notice').hidden = false; noticeTimer = setTimeout(() => { $('#notice').hidden = true; }, 6500); }
@@ -19,10 +19,10 @@ async function action(work, form, button) {
 function button(text, callback, cls = 'outline') { const node = element('button', text, cls); node.type = 'button'; node.addEventListener('click', () => action(() => callback(node), null, node)); return node; }
 function badge(status) { return element('span', statuses[status] || status, 'badge ' + status); }
 function showView(name) {
-  if (!adminArea && name !== 'proposals') return;
-  ['proposals', 'members', 'services'].forEach(view => { $('#' + view + '-view').hidden = view !== name; });
+  if (!adminArea && !['proposals','leads'].includes(name)) return;
+  ['proposals', 'leads', 'members', 'services'].forEach(view => { $('#' + view + '-view').hidden = view !== name; });
   document.querySelectorAll('[data-view]').forEach(node => { node.classList.toggle('active', node.dataset.view === name); if (node.dataset.view === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
-  $('#dashboard-title').textContent = name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
+  $('#dashboard-title').textContent = name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
 }
 function renderProposals() {
   const stats = $('#stats'); stats.replaceChildren();
@@ -39,6 +39,38 @@ function renderProposals() {
     const state = element('td'); state.append(badge(p.status)); row.append(state, element('td', date(p.updated_at)));
     const actions = element('td'); actions.append(button('View', () => openDetail(p.id))); row.append(actions); list.append(row);
   }
+}
+function renderLeads() {
+  const today = lagosToday(), stats = $('#lead-stats'); stats.replaceChildren();
+  const active = leads.filter(lead => !['won','lost'].includes(lead.stage));
+  for (const [label, count] of [['Total leads',leads.length],['Active conversations',active.length],['Follow-ups due',leads.filter(lead => leadDue(lead,today)).length],['Projects won',leads.filter(lead => lead.stage === 'won').length]]) {
+    const card = element('div', undefined, 'stat'); card.append(element('strong', String(count)), element('span', label)); stats.append(card);
+  }
+  $('#lead-error').hidden = !leadError; $('#lead-error').textContent = leadError; $('#new-lead').disabled = !!leadError;
+  const search = $('#lead-search').value.trim().toLowerCase(), stage = $('#lead-stage-filter').value, dueOnly = $('#lead-due-filter').checked;
+  const rows = leads.filter(lead => (!stage || lead.stage === stage) && (!dueOnly || leadDue(lead,today)) && (!search || [lead.company_name,lead.contact_name,lead.contact_details,adminArea ? members.find(m => m.id === lead.owner_id)?.full_name : ''].join(' ').toLowerCase().includes(search)))
+    .sort((a,b) => Number(leadDue(b,today))-Number(leadDue(a,today)) || (a.follow_up_date || '9999').localeCompare(b.follow_up_date || '9999') || b.updated_at.localeCompare(a.updated_at));
+  const list = $('#lead-list'); list.replaceChildren(); $('#empty-leads').hidden = rows.length > 0 || !!leadError;
+  for (const lead of rows) {
+    const row = element('tr'), client = element('td'); client.append(element('strong',lead.company_name));
+    if (lead.contact_name) client.append(element('small',lead.contact_name));
+    if (lead.contact_details) client.append(element('p',lead.contact_details,'lead-contact'));
+    if (adminArea) client.append(element('small','Owner: ' + (members.find(m => m.id === lead.owner_id)?.full_name || 'Ambassador')));
+    const state = element('td'); state.append(element('span',leadStages[lead.stage] || lead.stage,'badge '+lead.stage));
+    const follow = element('td',lead.follow_up_date ? date(lead.follow_up_date+'T12:00:00+01:00') : 'Not scheduled');
+    if (leadDue(lead,today)) follow.append(element('span',lead.follow_up_date === today ? 'Due today' : 'Overdue','badge follow-up-due'));
+    const actions = element('td'); actions.append(button('View / Update',()=>openLeadEditor(lead))); row.append(client,state,follow,actions); list.append(row);
+  }
+}
+function openLeadEditor(lead, proposal) {
+  if (leadError) { notify(leadError); return; }
+  const form = $('#lead-form'); form.reset(); form.querySelector('.form-message').textContent = '';
+  $('#lead-editor-title').textContent = lead ? 'Update client outreach.' : 'Add a lead.';
+  if (lead) for (const field of ['id','company_name','contact_name','contact_details','client_address','stage','follow_up_date','notes']) form.elements[field].value = lead[field] || '';
+  if (proposal) { form.elements.company_name.value = proposal.client_name; form.elements.contact_name.value = proposal.client_contact; form.elements.client_address.value = proposal.client_address; form.elements.notes.value = 'Proposal reference: ' + proposal.reference + '\nService: ' + proposal.service_name; }
+  const owner = lead ? (members.find(m => m.id === lead.owner_id)?.full_name || (lead.owner_id === profile.id ? profile.full_name : 'Ambassador')) : profile.full_name;
+  $('#lead-owner').textContent = 'Lead owner: ' + (owner || profile.email) + '. Update the stage after each conversation.';
+  $('#lead-dialog').showModal();
 }
 function renderMembers() {
   const list = $('#member-list'); list.replaceChildren();
@@ -64,7 +96,9 @@ async function loadData() {
   if (adminArea && profile.role !== 'admin') { api.clearSession(); throw new Error('This dashboard is for MUA administrators. Use the ambassador login page.'); }
   [proposals, services, members] = await Promise.all([api.proposals(), api.services(), adminArea ? api.profiles() : Promise.resolve([])]);
   if (!adminArea) proposals = proposals.filter(p => p.owner_id === profile.id);
-  renderProposals(); if (adminArea) { renderMembers(); renderServices(); }
+  try { leads = await api.leads(); leadError = ''; } catch (error) { leads = []; leadError = 'Client outreach is unavailable. If this is your first update, ask the administrator to run outreach-tracker.sql in Supabase, then refresh. Otherwise, check your connection and try again.'; }
+  if (!adminArea) leads = leads.filter(lead => lead.owner_id === profile.id);
+  renderLeads(); renderProposals(); if (adminArea) { renderMembers(); renderServices(); }
 }
 async function openWorkspace() {
   await loadData();
@@ -136,6 +170,7 @@ async function openDetail(id) {
     $('#print-letter').replaceChildren(buildLetter(latest));
     $('#detail-dialog').close(); window.print();
   }, 'primary'));
+  actions.append(button('Add to client outreach', () => { $('#detail-dialog').close(); openLeadEditor(null, p); }));
   const review = $('#review-form'); review.hidden = !(adminArea && p.status === 'submitted'); review.reset(); review.querySelector('.form-message').textContent = '';
   review.elements.letter_text.value = p.letter_text; review.elements.amount.value = p.amount ?? ''; review.elements.feedback.value = p.feedback || '';
   const events = await api.events(p.id); $('#event-list').replaceChildren(...events.map(event => element('li', `${date(event.created_at)} — ${event.kind}${event.detail ? ': ' + event.detail : ''}`)));
@@ -158,6 +193,13 @@ $('#login-form').addEventListener('submit', event => { event.preventDefault(); c
 $('#forgot-password').addEventListener('click', () => action(async () => { const email = $('#login-form').elements.email; if (!email.reportValidity()) return; await api.recover(email.value.trim()); notify('If this email has an account, a password-reset link will be sent.'); }, $('#login-form')));
 $('#sign-out').addEventListener('click', () => action(async () => { await api.signOut(); location.reload(); }, null, $('#sign-out')));
 $('#refresh').addEventListener('click', () => action(async () => { await loadData(); notify('Dashboard updated.'); }, null, $('#refresh')));
+$('#new-lead').addEventListener('click', () => openLeadEditor());
+$('#lead-search').addEventListener('input', renderLeads); $('#lead-stage-filter').addEventListener('change', renderLeads); $('#lead-due-filter').addEventListener('change', renderLeads);
+$('#lead-form').addEventListener('submit', event => { event.preventDefault(); const form = event.currentTarget; action(async () => {
+  const data = validateLead(Object.fromEntries(new FormData(form)));
+  await api.rpc('portal_save_lead', { p_id: data.id || null, p_company_name: data.company_name, p_contact_name: data.contact_name, p_contact_details: data.contact_details, p_client_address: data.client_address, p_stage: data.stage, p_follow_up_date: data.follow_up_date || null, p_notes: data.notes });
+  $('#lead-dialog').close(); await loadData(); showView('leads'); notify('Client outreach saved.');
+}, form); });
 $('#new-proposal').addEventListener('click', () => openEditor());
 $('#new-service').addEventListener('click', () => openService());
 $('#search').addEventListener('input', renderProposals); $('#status-filter').addEventListener('change', renderProposals);
