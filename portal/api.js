@@ -55,6 +55,7 @@ export class PortalAPI {
   leads() { return this.request('/rest/v1/portal_leads?select=*&order=updated_at.desc'); }
   projects() { return this.request('/rest/v1/portal_projects?select=*&order=updated_at.desc'); }
   documents() { return this.request('/rest/v1/portal_documents?select=*&order=issued_at.desc'); }
+  commissions() { return this.request('/rest/v1/portal_commissions?select=*&order=updated_at.desc'); }
   services() { return this.request('/rest/v1/portal_services?select=*&order=name.asc'); }
   profiles() { return this.request('/rest/v1/portal_profiles?select=*&order=created_at.desc'); }
   events(id) { return this.request('/rest/v1/portal_events?proposal_id=eq.' + encodeURIComponent(id) + '&select=*&order=created_at.asc'); }

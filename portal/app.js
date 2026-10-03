@@ -1,8 +1,8 @@
-import { PortalAPI } from './api.js?v=20261003-documents';
-import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance, projectStatuses, projectOverdue, projectBalance, validateProject, receiptAvailable, validateReceipt } from './core.js?v=20261003-documents';
+import { PortalAPI } from './api.js?v=20261003-commission';
+import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance, projectStatuses, projectOverdue, projectBalance, validateProject, receiptAvailable, validateReceipt, commissionEligible } from './core.js?v=20261003-commission';
 const api = new PortalAPI(window.MUA_PORTAL_CONFIG || {});
 const $ = selector => document.querySelector(selector);
-let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '', projects = [], projectError = '', billingProject, billingDocuments = [];
+let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '', projects = [], projectError = '', billingProject, billingDocuments = [], commissions = [], commissionError = '';
 const adminArea = document.body.dataset.area === 'admin';
 function element(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
 function notify(message) { clearTimeout(noticeTimer); $('#notice').textContent = message; $('#notice').hidden = false; noticeTimer = setTimeout(() => { $('#notice').hidden = true; }, 6500); }
@@ -32,11 +32,11 @@ function setMobileMenu(open, restoreFocus = false) {
   if (restoreFocus) $('#mobile-menu-toggle').focus();
 }
 function showView(name) {
-  if (!adminArea && !['proposals','leads'].includes(name)) return;
+  if (!adminArea && !['proposals','leads','commissions'].includes(name)) return;
   setMobileMenu(false);
-  ['proposals', 'leads', 'members', 'services', 'performance', 'projects'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
+  ['proposals', 'leads', 'members', 'services', 'performance', 'projects', 'commissions'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
   document.querySelectorAll('[data-view]').forEach(node => { node.classList.toggle('active', node.dataset.view === name); if (node.dataset.view === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
-  $('#dashboard-title').textContent = name === 'projects' ? 'Project delivery.' : name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
+  $('#dashboard-title').textContent = name === 'commissions' ? 'Ambassador commissions.' : name === 'projects' ? 'Project delivery.' : name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
 }
 function renderProposals() {
   const stats = $('#stats'); stats.replaceChildren();
@@ -125,7 +125,7 @@ function renderProjects() {
     const deadline = element('td',project.deadline ? date(project.deadline+'T12:00:00+01:00') : 'Not set');
     if (projectOverdue(project)) deadline.append(element('span','Overdue','badge follow-up-due'));
     const amounts = element('td'); amounts.append(element('div','Cost: '+money(project.total_cost)),element('div','Received: '+money(project.amount_received)),element('strong','Balance: '+money(projectBalance(project.total_cost,project.amount_received))));
-    const actions = element('td'); actions.append(button('View / Update',()=>openProjectEditor(project)),button('Invoices / Receipts',()=>openBilling(project.id))); row.append(client,element('td',project.assigned_to || 'Unassigned'),statusCell,deadline,amounts,actions); labelRow(row, ['Client & service','Assigned to','Progress','Deadline','Cost / received / balance','Action']); list.append(row);
+    const actions = element('td'); actions.append(button('View / Update',()=>openProjectEditor(project)),button('Invoices / Receipts',()=>openBilling(project.id)),button('Commission',()=>openCommissionEditor(project.id))); row.append(client,element('td',project.assigned_to || 'Unassigned'),statusCell,deadline,amounts,actions); labelRow(row, ['Client & service','Assigned to','Progress','Deadline','Cost / received / balance','Action']); list.append(row);
   }
 }
 function updateProjectPaymentSummary() {
@@ -182,6 +182,42 @@ async function openBillingDocument(id) {
   },'primary'),button('Back to project documents',async()=>{ $('#document-dialog').close();await openBilling(doc.project_id); }));
   $('#document-dialog').showModal();
 }
+function renderCommissions() {
+  const search=$('#commission-search').value.trim().toLowerCase(), filter=$('#commission-filter').value;
+  const rows=commissions.filter(c=>(!search || [c.client_name,c.service_name,adminArea ? members.find(m=>m.id===c.ambassador_id)?.full_name : profile.full_name].join(' ').toLowerCase().includes(search)) && (!filter || (filter==='payable' ? Number(c.eligible_amount)>Number(c.paid_amount) : filter==='waiting' ? !c.approved || Number(c.eligible_amount)===0 : Number(c.paid_amount)>=Number(c.fixed_amount))));
+  $('#commission-error').hidden=!commissionError;$('#commission-error').textContent=commissionError;$('#new-commission').disabled=!!commissionError || !!projectError;
+  const sum=key=>rows.reduce((total,c)=>total+Math.round(Number(c[key])*100),0), stats=$('#commission-stats');stats.replaceChildren();
+  for(const [label,value] of [['Fixed commission',sum('fixed_amount')],['Payable so far',sum('eligible_amount')],['Confirmed paid',sum('paid_amount')],['Payable balance',sum('eligible_amount')-sum('paid_amount')]]){
+    const card=element('div',undefined,'stat');card.append(element('strong',commissionError ? '—' : money(value/100)),element('span',label));stats.append(card);
+  }
+  const list=$('#commission-list');list.replaceChildren();$('#empty-commissions').hidden=!!commissionError || rows.length>0;
+  for(const c of rows){
+    const row=element('tr'),client=element('td');client.append(element('strong',c.client_name),element('small',c.service_name));
+    const stage=!c.approved ? 'Awaiting approval' : c.payment_stage==='fully_paid' ? 'Client fully paid' : c.payment_stage==='deposit_received' ? 'Client deposit confirmed' : 'Waiting for client deposit';
+    row.append(client,element('td',adminArea ? (members.find(m=>m.id===c.ambassador_id)?.full_name || 'Ambassador') : (profile.full_name || profile.email)),element('td',money(c.fixed_amount)),element('td',money(c.eligible_amount)),element('td',money(c.paid_amount)),element('td',money(projectBalance(c.eligible_amount,c.paid_amount))),element('td',stage));
+    const actions=element('td');if(adminArea)actions.append(button('View / Update',()=>openCommissionEditor(c.project_id)));else actions.append(element('span',c.payment_notes || 'Contact MUA about your payout.','small'));row.append(actions);
+    labelRow(row,['Client & service','Ambassador','Fixed amount','Payable so far','Paid','Payable balance','Progress','Action']);list.append(row);
+  }
+}
+function populateCommissionFields(){
+  const form=$('#commission-form'), c=commissions.find(item=>item.project_id===form.elements.project_id.value);
+  form.elements.expected_updated_at.value=c?.updated_at || '';form.elements.ambassador_id.value=c?.ambassador_id || '';form.elements.fixed_amount.value=c?.fixed_amount ?? '';form.elements.paid_amount.value=c?.paid_amount ?? 0;form.elements.approved.checked=!!c?.approved;form.elements.payment_notes.value=c?.payment_notes || '';
+  updateCommissionSummary();
+}
+function updateCommissionSummary(){
+  const form=$('#commission-form'),project=projects.find(item=>item.id===form.elements.project_id.value),fixed=form.elements.fixed_amount.value;
+  if(!project || fixed===''){ $('#commission-summary').textContent='Choose a project and enter its fixed commission.';return; }
+  const eligible=commissionEligible(fixed,project.total_cost,project.amount_received,form.elements.approved.checked),first=Math.round(Number(fixed)*100*0.5)/100;
+  $('#commission-summary').textContent='First half: '+money(first)+' · Second half: '+money(projectBalance(fixed,first))+' · Payable now: '+money(eligible)+' · Unpaid payable balance: '+money(projectBalance(eligible,form.elements.paid_amount.value || 0));
+}
+function openCommissionEditor(projectId){
+  if(!adminArea)return;if(commissionError || projectError){notify(commissionError || projectError);return;}
+  const form=$('#commission-form');form.reset();form.querySelector('.form-message').textContent='';
+  for(const [select,records,label] of [[form.elements.project_id,projects,'Choose a project'],[form.elements.ambassador_id,members.filter(m=>m.role==='ambassador'),'Choose an ambassador']]){
+    select.replaceChildren();const empty=element('option',label);empty.value='';select.append(empty);for(const record of records){const option=element('option',record.client_name ? record.client_name+' — '+record.service_name : (record.full_name || record.email)+(record.active ? '' : ' (inactive)'));option.value=record.id;select.append(option);}
+  }
+  form.elements.project_id.value=projectId || '';populateCommissionFields();$('#commission-dialog').showModal();
+}
 function renderMembers() {
   const list = $('#member-list'); list.replaceChildren();
   for (const member of members.filter(m => m.role === 'ambassador')) {
@@ -217,6 +253,9 @@ async function loadData() {
   renderLeads(); renderProposals(); if (adminArea) { renderMembers(); renderServices(); renderPerformance();
     try { projects = await api.projects(); projectError = ''; } catch (error) { projects = []; projectError = 'Project delivery is unavailable. If this is your first update, run project-delivery.sql in Supabase and refresh. Otherwise, check your connection and retry.'; }
     renderProjects(); }
+  try { commissions = await api.commissions(); commissionError = ''; } catch (error) { commissions = []; commissionError = 'Commission tracking is unavailable. For the first update, ask the admin to run commissions.sql in Supabase, then refresh. Otherwise, check your connection and retry.'; }
+  if (!adminArea) commissions = commissions.filter(c => c.ambassador_id === profile.id);
+  renderCommissions();
 }
 async function openWorkspace() {
   await loadData();
@@ -320,6 +359,16 @@ $('#forgot-password').addEventListener('click', () => action(async () => { const
 $('#sign-out').addEventListener('click', () => action(async () => { await api.signOut(); location.reload(); }, null, $('#sign-out')));
 $('#refresh').addEventListener('click', () => action(async () => { await loadData(); notify('Dashboard updated.'); }, null, $('#refresh')));
 if (adminArea) {
+  $('#new-commission').addEventListener('click',()=>openCommissionEditor());
+  $('#commission-project').addEventListener('change',populateCommissionFields);
+  for(const field of ['fixed_amount','paid_amount','approved'])$('#commission-form').elements[field].addEventListener('input',updateCommissionSummary);
+  $('#commission-form').addEventListener('submit',event=>{event.preventDefault();const form=event.currentTarget;action(async()=>{
+    if(!form.reportValidity())return;const data=Object.fromEntries(new FormData(form));
+    const existing=commissions.find(c=>c.project_id===data.project_id);
+    if(Number(data.paid_amount)>Number(existing?.paid_amount || 0) && !confirm('Confirm this commission payout was actually transferred and verified?'))return;
+    await api.rpc('portal_save_commission',{p_project_id:data.project_id,p_ambassador_id:data.ambassador_id,p_fixed_amount:Number(data.fixed_amount),p_approved:form.elements.approved.checked,p_paid_amount:Number(data.paid_amount),p_payment_notes:data.payment_notes,p_expected_updated_at:data.expected_updated_at || null});
+    $('#commission-dialog').close();await loadData();showView('commissions');notify('Commission record saved.');
+  },form);});
   $('#new-invoice').addEventListener('click',()=>action(async()=>{
     if(!billingProject || !confirm('Issue a new invoice using this project’s saved cost and confirmed payments?'))return;
     const id=await api.rpc('portal_issue_document',{p_project_id:billingProject.id,p_kind:'invoice',p_amount:null,p_paid_on:null,p_payment_reference:null,p_payment_method:null,p_expected_updated_at:billingProject.updated_at});
@@ -356,6 +405,7 @@ $('#mobile-nav-dialog').addEventListener('click', event => {
   if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) setMobileMenu(false, true);
 });
 window.matchMedia('(max-width:850px)').addEventListener('change', event => { if (!event.matches) setMobileMenu(false); });
+$('#commission-search').addEventListener('input',renderCommissions);$('#commission-filter').addEventListener('change',renderCommissions);
 $('#new-lead').addEventListener('click', () => openLeadEditor());
 $('#lead-owner-filter').addEventListener('change', renderLeads);
 if (adminArea) { $('#performance-search').addEventListener('input', renderPerformance); $('#performance-access').addEventListener('change', renderPerformance); $('#performance-sort').addEventListener('change', renderPerformance); }

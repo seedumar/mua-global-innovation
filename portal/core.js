@@ -18,6 +18,11 @@ export function leadDue(lead, today = lagosToday()) { return !!lead.follow_up_da
 export const projectStatuses = { not_started: 'Not started', in_progress: 'In progress', client_review: 'Client review', completed: 'Completed' };
 export function projectOverdue(project, today = lagosToday()) { return !!project.deadline && project.status !== 'completed' && project.deadline < today; }
 export function projectBalance(total, received) { return (Math.round(Number(total)*100)-Math.round(Number(received)*100))/100; }
+export function commissionEligible(fixed, total, received, approved = true) {
+  const fee = Math.round(Number(fixed)*100), cost = Math.round(Number(total)*100), paid = Math.round(Number(received)*100);
+  if (!approved || !Number.isFinite(fee) || !Number.isFinite(cost) || !Number.isFinite(paid) || fee<=0 || cost<=0) return 0;
+  return (paid>=cost ? fee : paid>=Math.round(cost*0.6) ? Math.round(fee*0.5) : 0)/100;
+}
 export function receiptAvailable(project, documents) {
   const issued = documents.filter(doc => doc.project_id === project.id && doc.kind === 'receipt').reduce((total,doc)=>total+Math.round(Number(doc.amount)*100),0);
   return Math.max(0,(Math.round(Number(project.amount_received)*100)-issued)/100);

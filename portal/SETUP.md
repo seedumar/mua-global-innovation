@@ -162,3 +162,14 @@ Saving a stale project version is rejected; refresh and reopen before re-enterin
 Documents are admin-only and cannot be edited or deleted by portal users. Confirmed payments cannot be reduced below issued receipt totals. Save project changes before issuing a document; stale project versions are rejected. This feature records documents and manually verified payments; it does not connect to Moniepoint or email documents automatically. If the documents table has not been installed, the Invoices / Receipts button will report the request error while Project delivery remains usable.
 
 Optional live checks: run `backend/document-permission-tests.sql`; its data is rolled back. Database tests must be run in your project after installation; local checks cover calculations and document rendering only.
+
+
+## Fixed ambassador commissions
+
+1. Run `backend/commissions.sql` in the existing Supabase project after project-delivery.sql. Do not rerun schema.sql. Upload this portal folder and hard refresh.
+2. Admin: open Project delivery → Commission, or Commissions → Assign commission. Choose the project and ambassador, set a fixed NGN amount, and approve it. One commission record is supported per project. Unapproved records are visible only to admins.
+3. Half the fixed commission becomes eligible when the confirmed cumulative client payments reach the required 60% deposit. The full commission becomes eligible after the full project cost is confirmed as received. No commission is eligible for a zero-cost project. Amounts round to kobo, with the second half preserving the agreed total.
+4. Eligibility is recalculated in the database when project costs or payments change. Record actual commission payouts separately as the cumulative Confirmed commission paid amount, with transfer dates and references. Saving records does not send money. Payouts cannot exceed eligibility or be reduced after confirmation. Paid terms cannot be reassigned or changed. Project payment changes that would invalidate a paid commission are rejected.
+5. Ambassadors can read only their own approved commission records and payout notes. They cannot approve terms or record payouts. Existing admins retain all records, including commissions assigned to inactive ambassadors.
+
+Optional live verification: run `backend/commission-permission-tests.sql`; its test data rolls back. Local tests verify arithmetic and UI structure. Install and verify the database policies in your Supabase project before relying on access isolation.
