@@ -1,5 +1,5 @@
 import { PortalAPI } from './api.js?v=20261003-outreach';
-import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue } from './core.js?v=20261003-outreach';
+import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance } from './core.js?v=20261003-performance';
 const api = new PortalAPI(window.MUA_PORTAL_CONFIG || {});
 const $ = selector => document.querySelector(selector);
 let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '';
@@ -20,9 +20,9 @@ function button(text, callback, cls = 'outline') { const node = element('button'
 function badge(status) { return element('span', statuses[status] || status, 'badge ' + status); }
 function showView(name) {
   if (!adminArea && !['proposals','leads'].includes(name)) return;
-  ['proposals', 'leads', 'members', 'services'].forEach(view => { $('#' + view + '-view').hidden = view !== name; });
+  ['proposals', 'leads', 'members', 'services', 'performance'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
   document.querySelectorAll('[data-view]').forEach(node => { node.classList.toggle('active', node.dataset.view === name); if (node.dataset.view === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
-  $('#dashboard-title').textContent = name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
+  $('#dashboard-title').textContent = name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
 }
 function renderProposals() {
   const stats = $('#stats'); stats.replaceChildren();
@@ -47,8 +47,8 @@ function renderLeads() {
     const card = element('div', undefined, 'stat'); card.append(element('strong', String(count)), element('span', label)); stats.append(card);
   }
   $('#lead-error').hidden = !leadError; $('#lead-error').textContent = leadError; $('#new-lead').disabled = !!leadError;
-  const search = $('#lead-search').value.trim().toLowerCase(), stage = $('#lead-stage-filter').value, dueOnly = $('#lead-due-filter').checked;
-  const rows = leads.filter(lead => (!stage || lead.stage === stage) && (!dueOnly || leadDue(lead,today)) && (!search || [lead.company_name,lead.contact_name,lead.contact_details,adminArea ? members.find(m => m.id === lead.owner_id)?.full_name : ''].join(' ').toLowerCase().includes(search)))
+  const search = $('#lead-search').value.trim().toLowerCase(), stage = $('#lead-stage-filter').value, dueOnly = $('#lead-due-filter').checked, owner = adminArea ? $('#lead-owner-filter').value : '';
+  const rows = leads.filter(lead => (!owner || lead.owner_id === owner) && (!stage || lead.stage === stage) && (!dueOnly || leadDue(lead,today)) && (!search || [lead.company_name,lead.contact_name,lead.contact_details,adminArea ? members.find(m => m.id === lead.owner_id)?.full_name : ''].join(' ').toLowerCase().includes(search)))
     .sort((a,b) => Number(leadDue(b,today))-Number(leadDue(a,today)) || (a.follow_up_date || '9999').localeCompare(b.follow_up_date || '9999') || b.updated_at.localeCompare(a.updated_at));
   const list = $('#lead-list'); list.replaceChildren(); $('#empty-leads').hidden = rows.length > 0 || !!leadError;
   for (const lead of rows) {
@@ -71,6 +71,27 @@ function openLeadEditor(lead, proposal) {
   const owner = lead ? (members.find(m => m.id === lead.owner_id)?.full_name || (lead.owner_id === profile.id ? profile.full_name : 'Ambassador')) : profile.full_name;
   $('#lead-owner').textContent = 'Lead owner: ' + (owner || profile.email) + '. Update the stage after each conversation.';
   $('#lead-dialog').showModal();
+}
+function renderPerformance() {
+  if (!adminArea) return;
+  const search = $('#performance-search').value.trim().toLowerCase(), access = $('#performance-access').value, sort = $('#performance-sort').value;
+  const rows = ambassadorPerformance(members,leads,proposals).filter(row => (!search || (row.name+' '+row.email).toLowerCase().includes(search)) && (!access || row.active === (access === 'active')))
+    .sort((a,b) => sort === 'name' ? a.name.localeCompare(b.name) : (b[sort] ?? -1)-(a[sort] ?? -1) || a.name.localeCompare(b.name));
+  $('#performance-error').hidden = !leadError;
+  const stats = $('#performance-stats'); stats.replaceChildren();
+  const sum = key => rows.reduce((total,row) => total+row[key],0);
+  for (const [label,value] of [['Ambassadors shown',rows.length],['Total leads',leadError ? '—' : sum('leads')],['Follow-ups due',leadError ? '—' : sum('due')],['Projects won',leadError ? '—' : sum('won')]]) {
+    const card = element('div',undefined,'stat'); card.append(element('strong',String(value)),element('span',label)); stats.append(card);
+  }
+  const list = $('#performance-list'); list.replaceChildren(); $('#empty-performance').hidden = rows.length > 0;
+  for (const report of rows) {
+    const row = element('tr'), identity = element('td'); identity.append(element('strong',report.name),element('small',report.email));
+    row.append(identity,element('td',report.active ? 'Active' : 'Inactive'),element('td',leadError ? '—' : String(report.leads)),element('td',String(report.proposals)),element('td',leadError ? '—' : String(report.due)),element('td',leadError ? '—' : String(report.won)),element('td',leadError || report.conversion == null ? '—' : report.conversion.toFixed(1)+'%'));
+    const actions = element('td'), view = button('View leads', () => {
+      $('#lead-search').value = ''; $('#lead-stage-filter').value = ''; $('#lead-due-filter').checked = false; $('#lead-owner-filter').value = report.id;
+      renderLeads(); showView('leads');
+    }); view.disabled = !!leadError; actions.append(view); row.append(actions); list.append(row);
+  }
 }
 function renderMembers() {
   const list = $('#member-list'); list.replaceChildren();
@@ -98,7 +119,13 @@ async function loadData() {
   if (!adminArea) proposals = proposals.filter(p => p.owner_id === profile.id);
   try { leads = await api.leads(); leadError = ''; } catch (error) { leads = []; leadError = 'Client outreach is unavailable. If this is your first update, ask the administrator to run outreach-tracker.sql in Supabase, then refresh. Otherwise, check your connection and try again.'; }
   if (!adminArea) leads = leads.filter(lead => lead.owner_id === profile.id);
-  renderLeads(); renderProposals(); if (adminArea) { renderMembers(); renderServices(); }
+  if (adminArea) {
+    const select = $('#lead-owner-filter'), chosen = select.value; select.replaceChildren();
+    const all = element('option','All owners'); all.value = ''; select.append(all);
+    for (const member of members) { const option = element('option',member.full_name || member.email); option.value = member.id; select.append(option); }
+    select.value = members.some(member => member.id === chosen) ? chosen : '';
+  }
+  renderLeads(); renderProposals(); if (adminArea) { renderMembers(); renderServices(); renderPerformance(); }
 }
 async function openWorkspace() {
   await loadData();
@@ -194,6 +221,8 @@ $('#forgot-password').addEventListener('click', () => action(async () => { const
 $('#sign-out').addEventListener('click', () => action(async () => { await api.signOut(); location.reload(); }, null, $('#sign-out')));
 $('#refresh').addEventListener('click', () => action(async () => { await loadData(); notify('Dashboard updated.'); }, null, $('#refresh')));
 $('#new-lead').addEventListener('click', () => openLeadEditor());
+$('#lead-owner-filter').addEventListener('change', renderLeads);
+if (adminArea) { $('#performance-search').addEventListener('input', renderPerformance); $('#performance-access').addEventListener('change', renderPerformance); $('#performance-sort').addEventListener('change', renderPerformance); }
 $('#lead-search').addEventListener('input', renderLeads); $('#lead-stage-filter').addEventListener('change', renderLeads); $('#lead-due-filter').addEventListener('change', renderLeads);
 $('#lead-form').addEventListener('submit', event => { event.preventDefault(); const form = event.currentTarget; action(async () => {
   const data = validateLead(Object.fromEntries(new FormData(form)));

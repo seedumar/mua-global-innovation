@@ -131,3 +131,10 @@ Payment details: Moniepoint; account name Mua Global Innovation Ltd; account num
 5. The proposal details panel has an Add to client outreach button that copies the recipient details and proposal reference into a new lead. Check for an existing company before adding it again. Creating or approving a proposal does not automatically change lead progress.
 
 The portal keeps proposal features available if the outreach table has not yet been installed, and shows a setup message in Client outreach. Optional database verification: run `backend/outreach-permission-tests.sql`; its temporary users and records are rolled back. Live database verification must be completed in your Supabase project after installation.
+
+
+## Ambassador performance reports
+
+Replace the portal folder and hard refresh to add Performance reports in the admin dashboard. No additional SQL is required once the outreach tracker is installed. Reports use all-time ambassador-owned leads and proposals, including inactive ambassadors; admin-owned records are excluded. Search, access filters and sorting update the report, and summary cards reflect the filtered ambassadors. View leads opens outreach filtered to that ambassador.
+
+Conversion means leads currently marked Won divided by all leads belonging to the ambassador; ambassadors with no leads show a dash. Won counts depend on the manually recorded lead stage and do not confirm revenue or payment. If outreach cannot load, its metrics show dashes rather than misleading zero counts; proposal counts remain available.

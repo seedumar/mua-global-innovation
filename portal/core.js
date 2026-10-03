@@ -15,6 +15,16 @@ export function lagosToday(now = new Date()) {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 export function leadDue(lead, today = lagosToday()) { return !!lead.follow_up_date && !['won','lost'].includes(lead.stage) && lead.follow_up_date <= today; }
+export function ambassadorPerformance(members, leads, proposals, today = lagosToday()) {
+  return members.filter(member => member.role === 'ambassador').map(member => {
+    const owned = leads.filter(lead => lead.owner_id === member.id);
+    const letters = proposals.filter(proposal => proposal.owner_id === member.id);
+    const won = owned.filter(lead => lead.stage === 'won').length;
+    return { id: member.id, name: member.full_name || member.email || 'Ambassador', email: member.email || '', active: member.active,
+      leads: owned.length, proposals: letters.length, due: owned.filter(lead => leadDue(lead,today)).length, won,
+      conversion: owned.length ? won / owned.length * 100 : null };
+  });
+}
 export function validateBrief(data) {
   if (!data.service_id) throw new Error('Choose a service.');
   if (!data.client_name?.trim() || data.client_name.length > 200) throw new Error('Enter a recipient name of up to 200 characters.');
