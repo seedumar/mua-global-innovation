@@ -1,8 +1,8 @@
-import { PortalAPI } from './api.js?v=20261003-delivery';
-import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance, projectStatuses, projectOverdue, projectBalance, validateProject } from './core.js?v=20261003-delivery';
+import { PortalAPI } from './api.js?v=20261003-documents';
+import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance, projectStatuses, projectOverdue, projectBalance, validateProject, receiptAvailable, validateReceipt } from './core.js?v=20261003-documents';
 const api = new PortalAPI(window.MUA_PORTAL_CONFIG || {});
 const $ = selector => document.querySelector(selector);
-let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '', projects = [], projectError = '';
+let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '', projects = [], projectError = '', billingProject, billingDocuments = [];
 const adminArea = document.body.dataset.area === 'admin';
 function element(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
 function notify(message) { clearTimeout(noticeTimer); $('#notice').textContent = message; $('#notice').hidden = false; noticeTimer = setTimeout(() => { $('#notice').hidden = true; }, 6500); }
@@ -18,8 +18,19 @@ async function action(work, form, button) {
 }
 function button(text, callback, cls = 'outline') { const node = element('button', text, cls); node.type = 'button'; node.addEventListener('click', () => action(() => callback(node), null, node)); return node; }
 function badge(status) { return element('span', statuses[status] || status, 'badge ' + status); }
+function labelRow(row, labels) {
+  row.setAttribute('role', 'row');
+  [...row.children].forEach((cell, index) => { cell.setAttribute('role', 'cell'); cell.setAttribute('data-label', labels[index] || ''); });
+}
+function setMobileMenu(open, restoreFocus = false) {
+  $('#portal-sidebar').classList.toggle('mobile-open', open);
+  $('#mobile-menu-toggle').setAttribute('aria-expanded', String(open));
+  $('#mobile-menu-toggle').textContent = open ? 'Close menu' : 'Menu';
+  if (restoreFocus) $('#mobile-menu-toggle').focus();
+}
 function showView(name) {
   if (!adminArea && !['proposals','leads'].includes(name)) return;
+  setMobileMenu(false);
   ['proposals', 'leads', 'members', 'services', 'performance', 'projects'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
   document.querySelectorAll('[data-view]').forEach(node => { node.classList.toggle('active', node.dataset.view === name); if (node.dataset.view === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
   $('#dashboard-title').textContent = name === 'projects' ? 'Project delivery.' : name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
@@ -37,7 +48,7 @@ function renderProposals() {
     if (adminArea) recipient.append(element('small', members.find(m => m.id === p.owner_id)?.full_name || 'Ambassador'));
     row.append(recipient, element('td', p.service_name), element('td', p.reference));
     const state = element('td'); state.append(badge(p.status)); row.append(state, element('td', date(p.updated_at)));
-    const actions = element('td'); actions.append(button('View', () => openDetail(p.id))); row.append(actions); list.append(row);
+    const actions = element('td'); actions.append(button('View', () => openDetail(p.id))); row.append(actions); labelRow(row, ['Recipient','Service','Reference','Status','Updated','Action']); list.append(row);
   }
 }
 function renderLeads() {
@@ -59,7 +70,7 @@ function renderLeads() {
     const state = element('td'); state.append(element('span',leadStages[lead.stage] || lead.stage,'badge '+lead.stage));
     const follow = element('td',lead.follow_up_date ? date(lead.follow_up_date+'T12:00:00+01:00') : 'Not scheduled');
     if (leadDue(lead,today)) follow.append(element('span',lead.follow_up_date === today ? 'Due today' : 'Overdue','badge follow-up-due'));
-    const actions = element('td'); actions.append(button('View / Update',()=>openLeadEditor(lead))); row.append(client,state,follow,actions); list.append(row);
+    const actions = element('td'); actions.append(button('View / Update',()=>openLeadEditor(lead))); row.append(client,state,follow,actions); labelRow(row, ['Company & contact','Progress','Next follow-up','Action']); list.append(row);
   }
 }
 function openLeadEditor(lead, proposal) {
@@ -90,7 +101,7 @@ function renderPerformance() {
     const actions = element('td'), view = button('View leads', () => {
       $('#lead-search').value = ''; $('#lead-stage-filter').value = ''; $('#lead-due-filter').checked = false; $('#lead-owner-filter').value = report.id;
       renderLeads(); showView('leads');
-    }); view.disabled = !!leadError; actions.append(view); row.append(actions); list.append(row);
+    }); view.disabled = !!leadError; actions.append(view); row.append(actions); labelRow(row, ['Ambassador','Access','Leads','Proposals','Follow-ups due','Projects won','Conversion','Action']); list.append(row);
   }
 }
 function renderProjects() {
@@ -111,7 +122,7 @@ function renderProjects() {
     const deadline = element('td',project.deadline ? date(project.deadline+'T12:00:00+01:00') : 'Not set');
     if (projectOverdue(project)) deadline.append(element('span','Overdue','badge follow-up-due'));
     const amounts = element('td'); amounts.append(element('div','Cost: '+money(project.total_cost)),element('div','Received: '+money(project.amount_received)),element('strong','Balance: '+money(projectBalance(project.total_cost,project.amount_received))));
-    const actions = element('td'); actions.append(button('View / Update',()=>openProjectEditor(project))); row.append(client,element('td',project.assigned_to || 'Unassigned'),statusCell,deadline,amounts,actions); list.append(row);
+    const actions = element('td'); actions.append(button('View / Update',()=>openProjectEditor(project)),button('Invoices / Receipts',()=>openBilling(project.id))); row.append(client,element('td',project.assigned_to || 'Unassigned'),statusCell,deadline,amounts,actions); labelRow(row, ['Client & service','Assigned to','Progress','Deadline','Cost / received / balance','Action']); list.append(row);
   }
 }
 function updateProjectPaymentSummary() {
@@ -129,6 +140,45 @@ function openProjectEditor(project, proposal) {
   if (proposal) { form.elements.client_name.value = proposal.client_name; form.elements.service_name.value = proposal.service_name; form.elements.total_cost.value = proposal.amount ?? ''; form.elements.notes.value = 'Proposal reference: '+proposal.reference; }
   updateProjectPaymentSummary(); $('#project-dialog').showModal();
 }
+async function openBilling(projectId) {
+  if (!adminArea) return;
+  const [latest, docs] = await Promise.all([api.projects(),api.documents()]);
+  billingProject = latest.find(project=>project.id===projectId);
+  if (!billingProject) throw new Error('Project unavailable. Refresh your dashboard.');
+  billingDocuments = docs.filter(doc=>doc.project_id===projectId);
+  $('#billing-title').textContent = 'Documents for '+billingProject.client_name;
+  const available = receiptAvailable(billingProject,billingDocuments);
+  $('#billing-summary').textContent = 'Cost: '+money(billingProject.total_cost)+' · Confirmed received: '+money(billingProject.amount_received)+' · Available for new receipts: '+money(available);
+  $('#new-receipt').disabled = available<=0;
+  const list = $('#billing-list'); list.replaceChildren();
+  for (const doc of billingDocuments) { const row = element('tr'); row.append(element('td',doc.reference),element('td',doc.kind==='invoice' ? 'Invoice' : 'Receipt'),element('td',date(doc.issued_at)),element('td',money(doc.kind==='receipt' ? doc.amount : doc.total_cost))); const actions=element('td'); actions.append(button('View / Print',()=>openBillingDocument(doc.id))); row.append(actions); labelRow(row, ['Reference','Document','Issued','Amount','Action']); list.append(row); }
+  $('#empty-billing').hidden = billingDocuments.length>0;
+  if (!$('#billing-dialog').open) $('#billing-dialog').showModal();
+}
+function buildBillingDocument(doc) {
+  const letter=letterPage(), isReceipt=doc.kind==='receipt';
+  letter.append(element('h2',isReceipt ? 'PAYMENT RECEIPT' : 'INVOICE','letter-subject'),element('p','Reference: '+doc.reference+' · Issued: '+date(doc.issued_at)),element('p','Client: '+doc.client_name),element('p','Service / project: '+doc.service_name));
+  const section=element('section',undefined,'letter-quotation'), table=element('table',undefined,'quotation-table'), body=element('tbody'); table.append(element('caption',isReceipt ? 'Verified payment details' : 'Project cost and payment summary'));
+  const deposit=Math.round(Number(doc.total_cost)*100*Number(doc.deposit_percent)/100)/100;
+  const rows=isReceipt ? [['This payment received',money(doc.amount)],['Payment date',date(doc.paid_on+'T12:00:00+01:00')],['Payment method',doc.payment_method],['Payment reference',doc.payment_reference]] : [['Total project cost',money(doc.total_cost)],['Required deposit ('+doc.deposit_percent+'%)',money(deposit)],['Deposit still due',money(Math.max(0,projectBalance(deposit,doc.confirmed_received)))]];
+  rows.push(['Total confirmed received at issue',money(doc.confirmed_received)],['Outstanding balance at issue',money(projectBalance(doc.total_cost,doc.confirmed_received))]);
+  for (const [label,value] of rows) { const row=element('tr'), heading=element('th',label); heading.scope='row';row.append(heading,element('td',value));body.append(row); } table.append(body);section.append(table);
+  if (!isReceipt) section.append(element('p','Payment terms: '+doc.deposit_percent+'% deposit; remaining '+(100-doc.deposit_percent)+'% balance. Amounts already confirmed are reflected above.'),element('h3','Payment details'),element('p','Bank: '+doc.bank_name+'\nAccount name: '+doc.account_name+'\nAccount number: '+doc.account_number,'letter-bank'),element('p','Use this invoice reference as your payment narration.'));
+  else section.append(element('p','MUA Global Innovation Ltd acknowledges the verified payment shown above. The project totals reflect the records at the time this receipt was issued.'));
+  letter.append(section,element('p','Issued by: '+doc.issuer_name+'\nFor MUA Global Innovation Ltd','letter-bank'),element('p','MUA Global Innovation Ltd • Building practical digital solutions','letter-footer'));
+  return letter;
+}
+async function openBillingDocument(id) {
+  const doc=(await api.documents()).find(item=>item.id===id);
+  if (!doc) throw new Error('Document unavailable.');
+  $('#billing-dialog').close(); $('#document-title').textContent=doc.reference;
+  $('#document-preview').replaceChildren(...buildBillingDocument(doc).childNodes);
+  $('#document-actions').replaceChildren(button('Print / Save as PDF',async()=>{
+    const fresh=(await api.documents()).find(item=>item.id===id);if(!fresh)throw new Error('Document unavailable.');
+    $('#print-letter').replaceChildren(buildBillingDocument(fresh));$('#document-dialog').close();window.print();
+  },'primary'),button('Back to project documents',async()=>{ $('#document-dialog').close();await openBilling(doc.project_id); }));
+  $('#document-dialog').showModal();
+}
 function renderMembers() {
   const list = $('#member-list'); list.replaceChildren();
   for (const member of members.filter(m => m.role === 'ambassador')) {
@@ -136,7 +186,7 @@ function renderMembers() {
     const actions = element('td'); actions.append(button(member.active ? 'Deactivate' : 'Activate', async () => {
       if (!confirm(`${member.active ? 'Deactivate' : 'Activate'} access for ${member.full_name || member.email}?`)) return;
       await api.rpc('portal_set_member_active', { p_id: member.id, p_active: !member.active }); await loadData(); notify('Account access updated.');
-    })); row.append(actions); list.append(row);
+    })); row.append(actions); labelRow(row, ['Name','Email','Access','Action']); list.append(row);
   }
   if (!list.children.length) { const row = element('tr'), cell = element('td', 'No ambassador accounts yet. Invite an approved applicant above.'); cell.colSpan = 4; row.append(cell); list.append(row); }
 }
@@ -183,13 +233,17 @@ function openEditor(proposal) {
   if (proposal) for (const field of ['id', 'service_id', 'client_name', 'client_contact', 'client_address', 'notes']) form.elements[field].value = proposal[field] || '';
   $('#proposal-dialog').showModal();
 }
-function buildLetter(p) {
+function letterPage() {
   const letter = element('article', undefined, 'letter-preview');
   const watermark = element('img', undefined, 'letter-watermark'); watermark.src = './letterhead-watermark.png'; watermark.alt = ''; watermark.setAttribute('aria-hidden', 'true'); letter.append(watermark);
   const brand = element('header', undefined, 'letter-brand'), image = element('img'); image.src = './letterhead-logo.png'; image.alt = 'MUA Global Innovation Ltd'; image.width = 479; image.height = 388;
   const lockup = element('div', undefined, 'letter-company'); lockup.append(element('strong', 'MUA GLOBAL INNOVATION LTD'), element('span', 'Technology • Innovation • Digital Solutions', 'letter-tagline'));
   for (const line of ['No. 106, Abs House, Zoo Road', '07068744549 | 08025063991', 'muaglobalinnovation@gmail.com', 'www.muaglobalinnovation.com | RC 8815036']) lockup.append(element('span', line, 'letter-company-detail'));
   brand.append(image, lockup); letter.append(brand);
+  return letter;
+}
+function buildLetter(p) {
+  const letter = letterPage();
   if (!canPrint(p)) letter.append(element('p', 'DRAFT · FOR MUA REVIEW', 'draft-stamp'));
   letter.append(element('p', `${date(p.approved_at || p.created_at)} · Ref: ${reference(p.reference)}`));
   const address = element('p', undefined, 'letter-address'); address.append(element('strong', p.client_name), document.createTextNode('\n' + p.client_address + (p.client_contact ? '\nAttention: ' + p.client_contact : ''))); letter.append(address);
@@ -260,6 +314,22 @@ $('#forgot-password').addEventListener('click', () => action(async () => { const
 $('#sign-out').addEventListener('click', () => action(async () => { await api.signOut(); location.reload(); }, null, $('#sign-out')));
 $('#refresh').addEventListener('click', () => action(async () => { await loadData(); notify('Dashboard updated.'); }, null, $('#refresh')));
 if (adminArea) {
+  $('#new-invoice').addEventListener('click',()=>action(async()=>{
+    if(!billingProject || !confirm('Issue a new invoice using this project’s saved cost and confirmed payments?'))return;
+    const id=await api.rpc('portal_issue_document',{p_project_id:billingProject.id,p_kind:'invoice',p_amount:null,p_paid_on:null,p_payment_reference:null,p_payment_method:null,p_expected_updated_at:billingProject.updated_at});
+    await openBillingDocument(id);notify('Invoice issued and saved.');
+  },null,$('#new-invoice')));
+  $('#new-receipt').addEventListener('click',()=>{
+    const form=$('#receipt-form');form.reset();form.querySelector('.form-message').textContent='';form.elements.paid_on.max=lagosToday();
+    $('#receipt-available').textContent='Available confirmed payments: '+money(receiptAvailable(billingProject,billingDocuments))+'. Enter one verified payment, not the cumulative project total.';
+    $('#billing-dialog').close();$('#receipt-dialog').showModal();
+  });
+  $('#receipt-form').addEventListener('submit',event=>{event.preventDefault();const form=event.currentTarget;action(async()=>{
+    if(!form.elements.verified.checked)throw new Error('Confirm that you verified this payment.');
+    const data=validateReceipt(Object.fromEntries(new FormData(form)),receiptAvailable(billingProject,billingDocuments));
+    const id=await api.rpc('portal_issue_document',{p_project_id:billingProject.id,p_kind:'receipt',p_amount:Number(data.amount),p_paid_on:data.paid_on,p_payment_reference:data.payment_reference,p_payment_method:data.payment_method,p_expected_updated_at:billingProject.updated_at});
+    $('#receipt-dialog').close();await openBillingDocument(id);notify('Payment receipt issued and saved.');
+  },form);});
   $('#new-project').addEventListener('click',()=>openProjectEditor());
   $('#project-search').addEventListener('input',renderProjects); $('#project-status-filter').addEventListener('change',renderProjects); $('#project-overdue-filter').addEventListener('change',renderProjects);
   for (const field of ['total_cost','amount_received']) $('#delivery-form').elements[field].addEventListener('input',updateProjectPaymentSummary);
@@ -269,6 +339,8 @@ if (adminArea) {
     $('#project-dialog').close(); await loadData(); showView('projects'); notify('Project delivery updated.');
   },form); });
 }
+$('#mobile-menu-toggle').addEventListener('click', () => setMobileMenu($('#mobile-menu-toggle').getAttribute('aria-expanded') !== 'true'));
+$('#portal-sidebar').addEventListener('keydown', event => { if (event.key === 'Escape' && $('#mobile-menu-toggle').getAttribute('aria-expanded') === 'true') setMobileMenu(false, true); });
 $('#new-lead').addEventListener('click', () => openLeadEditor());
 $('#lead-owner-filter').addEventListener('change', renderLeads);
 if (adminArea) { $('#performance-search').addEventListener('input', renderPerformance); $('#performance-access').addEventListener('change', renderPerformance); $('#performance-sort').addEventListener('change', renderPerformance); }

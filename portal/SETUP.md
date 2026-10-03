@@ -149,3 +149,16 @@ Conversion means leads currently marked Won divided by all leads belonging to th
 5. Approved proposal details provide Create delivery project, which copies the client, service, quoted amount and proposal reference. Check for an existing project first. Delivery progress is independent of the outreach lead stage.
 
 Saving a stale project version is rejected; refresh and reopen before re-entering changes. Proposal/outreach features remain available if delivery is not yet installed. Optional live verification: run `backend/project-permission-tests.sql`; test users and projects roll back. Local unit and UI checks do not substitute for installing and verifying the policies in your Supabase project.
+
+
+## Enable invoices and receipts
+
+1. After project-delivery.sql is installed, run `backend/invoices-receipts.sql` in Supabase SQL Editor. It adds immutable document snapshots, document references and a payment safeguard. Do not rerun schema.sql.
+2. Upload this portal folder and hard refresh. In Project delivery, select Invoices / Receipts for a saved project.
+3. Issue invoice saves a numbered invoice with the current client, service, cost, deposit, confirmed payments, outstanding balance and MUA bank details. Check the existing list before issuing another invoice.
+4. Confirm the received cumulative amount in Project delivery against actual bank records first. Then Issue payment receipt for one verified transaction: enter its amount, actual date, payment method and reference, and confirm verification. Existing confirmed payments are not automatically converted into receipts. The receipt total cannot exceed payments confirmed but not yet receipted. Duplicate references on the same project are blocked.
+5. View / Print opens a document on the latest MUA letterhead. Print / Save as PDF uses the browser print dialog. Each issued document keeps its original financial and client details even when the project is later updated. The printed outstanding balance is explicitly the balance at issue time. Receipts do not add another payment to the project total.
+
+Documents are admin-only and cannot be edited or deleted by portal users. Confirmed payments cannot be reduced below issued receipt totals. Save project changes before issuing a document; stale project versions are rejected. This feature records documents and manually verified payments; it does not connect to Moniepoint or email documents automatically. If the documents table has not been installed, the Invoices / Receipts button will report the request error while Project delivery remains usable.
+
+Optional live checks: run `backend/document-permission-tests.sql`; its data is rolled back. Database tests must be run in your project after installation; local checks cover calculations and document rendering only.

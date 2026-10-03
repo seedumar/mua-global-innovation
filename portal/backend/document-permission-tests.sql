@@ -1,0 +1,45 @@
+-- Optional verification after invoices-receipts.sql; no test data persists.
+begin;
+do $$
+declare adm uuid:=gen_random_uuid(); amb uuid:=gen_random_uuid(); p uuid; inv uuid; rct uuid; stamp timestamptz; denied boolean; visible integer;
+begin
+ insert into auth.users(id,email) values(adm,adm::text||'@document-test.invalid'),(amb,amb::text||'@document-test.invalid');
+ update public.portal_profiles set active=true where id in(adm,amb);
+ update public.portal_profiles set role='admin' where id=adm;
+ perform set_config('request.jwt.claim.sub',adm::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',adm,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ p:=public.portal_save_project(null,null,'Test client','Website','',null,'not_started',150000,90000,'Confirmed','');
+ select updated_at into stamp from public.portal_projects where id=p;
+ inv:=public.portal_issue_document(p,'invoice',null,null,null,null,stamp);
+ rct:=public.portal_issue_document(p,'receipt',30000,current_date,'BANK-123','Bank transfer',stamp);
+ denied:=false;
+ begin perform public.portal_issue_document(p,'receipt',30000,current_date,'bank-123','Bank transfer',stamp); exception when others then if sqlerrm='A receipt for this payment reference already exists.' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: duplicate reference accepted.'; end if;
+ denied:=false;
+ begin perform public.portal_issue_document(p,'receipt',70000,current_date,'BANK-456','Bank transfer',stamp); exception when others then if sqlerrm like 'Receipt exceeds%' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: over-receipting accepted.'; end if;
+ denied:=false;
+ begin perform public.portal_save_project(p,stamp,'Test client','Website','',null,'not_started',150000,20000,'',''); exception when others then if sqlerrm='Confirmed payments cannot be reduced below issued receipts.' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: receipted payments reduced.'; end if;
+ perform public.portal_save_project(p,stamp,'Updated client','Website','',null,'in_progress',200000,90000,'','');
+ if (select total_cost from public.portal_documents where id=inv)<>150000 or (select client_name from public.portal_documents where id=inv)<>'Test client' then raise exception 'FAIL: invoice snapshot changed.'; end if;
+ denied:=false;
+ begin update public.portal_documents set amount=1 where id=rct; exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'FAIL: issued receipt editable.'; end if;
+ denied:=false;
+ begin perform public.portal_issue_document(p,'invoice',null,null,null,null,stamp); exception when others then if sqlerrm like 'Project changed.%' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: stale invoice issued.'; end if;
+ execute 'reset role';
+ perform set_config('request.jwt.claim.sub',amb::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',amb,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ select count(*) into visible from public.portal_documents where project_id=p;
+ if visible<>0 then raise exception 'FAIL: ambassador read billing documents.'; end if;
+ denied:=false;
+ begin perform public.portal_issue_document(p,'invoice',null,null,null,null,stamp); exception when others then if sqlerrm='Admin access required.' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: ambassador issued invoice.'; end if;
+ execute 'reset role';
+ raise notice 'PASS: invoice snapshots, receipt limits, unique references, immutable documents, stale-edit protection and admin access.';
+end $$;
+rollback;

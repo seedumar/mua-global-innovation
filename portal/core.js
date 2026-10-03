@@ -18,6 +18,18 @@ export function leadDue(lead, today = lagosToday()) { return !!lead.follow_up_da
 export const projectStatuses = { not_started: 'Not started', in_progress: 'In progress', client_review: 'Client review', completed: 'Completed' };
 export function projectOverdue(project, today = lagosToday()) { return !!project.deadline && project.status !== 'completed' && project.deadline < today; }
 export function projectBalance(total, received) { return (Math.round(Number(total)*100)-Math.round(Number(received)*100))/100; }
+export function receiptAvailable(project, documents) {
+  const issued = documents.filter(doc => doc.project_id === project.id && doc.kind === 'receipt').reduce((total,doc)=>total+Math.round(Number(doc.amount)*100),0);
+  return Math.max(0,(Math.round(Number(project.amount_received)*100)-issued)/100);
+}
+export function validateReceipt(data, available, today = lagosToday()) {
+  const amount = Number(data.amount);
+  if (!Number.isFinite(amount) || amount<=0 || amount>available || Math.abs(amount*100-Math.round(amount*100))>0.00001) throw new Error('Enter a payment amount within the confirmed amount available for receipt.');
+  if (!data.paid_on || !/^\d{4}-\d{2}-\d{2}$/.test(data.paid_on) || !Number.isFinite(Date.parse(data.paid_on)) || new Date(data.paid_on).toISOString().slice(0,10)!==data.paid_on || data.paid_on>today) throw new Error('Enter a valid payment date that is not in the future.');
+  if (!data.payment_reference?.trim() || data.payment_reference.length>200) throw new Error('Enter the payment reference of up to 200 characters.');
+  if (!['Bank transfer','Cash','POS'].includes(data.payment_method)) throw new Error('Choose a payment method.');
+  return data;
+}
 export function validateProject(data) {
   for (const field of ['client_name','service_name']) if (!data[field]?.trim() || data[field].length > 200) throw new Error('Enter a client and service name of up to 200 characters.');
   if (!Object.hasOwn(projectStatuses,data.status)) throw new Error('Choose a project status.');
