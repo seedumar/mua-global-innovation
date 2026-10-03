@@ -113,3 +113,10 @@ Complete the following in the connected portal with one admin and two ambassador
 - Check mobile layouts and print long letters as PDF, including addresses and multi-page bodies.
 
 Database integration, invitation email delivery and visual browser review have not been run in a live Supabase project. Sessions are held in session storage for the current browser tab; clearing the tab's stored data signs the user out. Do not add untrusted HTML, third-party analytics scripts or secret credentials to the portal.
+
+
+## Project quotation and payment details
+
+Enter the total project cost in the admin review before approving the proposal. The letter includes the selected service, total cost, a 60% deposit, and a 40% remaining balance. Calculations use kobo rounding so the deposit and balance add up to the total. If no price is entered, the letter states that the project cost is to be agreed; it does not show a zero-price quote.
+
+Payment details: Moniepoint; account name Mua Global Innovation Ltd; account number 6520592152. These company details and the 60/40 split are applied when viewing or printing letters, including existing proposals. Replace the portal folder to deploy this update; no database migration is required.

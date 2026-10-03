@@ -1,5 +1,5 @@
 import { PortalAPI } from './api.js';
-import { statuses, validateBrief, canEdit, canPrint, money, date, reference } from './core.js';
+import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference } from './core.js?v=20261003-payment';
 const api = new PortalAPI(window.MUA_PORTAL_CONFIG || {});
 const $ = selector => document.querySelector(selector);
 let profile, proposals = [], services = [], members = [], current, noticeTimer;
@@ -86,17 +86,35 @@ function openEditor(proposal) {
 }
 function buildLetter(p) {
   const letter = element('article', undefined, 'letter-preview');
-  const brand = element('div', undefined, 'letter-brand'), image = element('img'); image.src = '../assets/mua-logo-shield.webp'; image.alt = 'MUA Global Innovation';
-  const lockup = element('div'); lockup.append(element('strong', 'MUA Global Innovation Ltd'), element('small', 'Technology built for real impact')); brand.append(image, lockup); letter.append(brand);
+  const watermark = element('img', undefined, 'letter-watermark'); watermark.src = './letterhead-watermark.png'; watermark.alt = ''; watermark.setAttribute('aria-hidden', 'true'); letter.append(watermark);
+  const brand = element('header', undefined, 'letter-brand'), image = element('img'); image.src = './letterhead-logo.png'; image.alt = 'MUA Global Innovation Ltd'; image.width = 479; image.height = 388;
+  const lockup = element('div', undefined, 'letter-company'); lockup.append(element('strong', 'MUA GLOBAL INNOVATION LTD'), element('span', 'Technology • Innovation • Digital Solutions', 'letter-tagline'));
+  for (const line of ['No. 106, Abs House, Zoo Road', '07068744549 | 08025063991', 'muaglobalinnovation@gmail.com', 'www.muaglobalinnovation.com | RC 8815036']) lockup.append(element('span', line, 'letter-company-detail'));
+  brand.append(image, lockup); letter.append(brand);
   if (!canPrint(p)) letter.append(element('p', 'DRAFT · FOR MUA REVIEW', 'draft-stamp'));
   letter.append(element('p', `${date(p.approved_at || p.created_at)} · Ref: ${reference(p.reference)}`));
   const address = element('p', undefined, 'letter-address'); address.append(element('strong', p.client_name), document.createTextNode('\n' + p.client_address + (p.client_contact ? '\nAttention: ' + p.client_contact : ''))); letter.append(address);
   letter.append(element('p', 'PROPOSAL: ' + p.service_name, 'letter-subject'), element('p', 'Dear Sir/Madam,'), element('div', p.letter_text, 'letter-body'));
-  if (p.amount != null) letter.append(element('p', 'Quoted project amount: ' + money(p.amount)));
+  const payment = paymentBreakdown(p.amount);
+  const quotation = element('section', undefined, 'letter-quotation');
+  quotation.append(element('h3', 'Project quotation'));
+  if (payment) {
+    const table = element('table', undefined, 'quotation-table');
+    const caption = element('caption', 'Quotation for ' + p.service_name); table.append(caption);
+    const head = element('thead'), headings = element('tr');
+    for (const title of ['Service', 'Amount (NGN)']) { const cell = element('th', title); cell.scope = 'col'; headings.append(cell); }
+    head.append(headings); table.append(head);
+    const body = element('tbody'), row = element('tr'); row.append(element('td', p.service_name), element('td', money(payment.total))); body.append(row); table.append(body);
+    const foot = element('tfoot'), total = element('tr'); total.append(element('th', 'Total project cost'), element('td', money(payment.total))); foot.append(total); table.append(foot);
+    quotation.append(table, element('p', 'Deposit (60%): ' + money(payment.deposit), 'payment-deposit'), element('p', 'Remaining balance (40%): ' + money(payment.balance)));
+  } else quotation.append(element('p', 'Project cost: To be agreed. A 60% deposit and 40% remaining balance apply once the quotation is confirmed.'));
+  quotation.append(element('h3', 'Payment details'), element('p', 'Bank: Moniepoint\nAccount name: Mua Global Innovation Ltd\nAccount number: 6520592152', 'letter-bank'), element('p', 'Use the proposal reference as your payment narration.', 'payment-note'));
+  if (!canPrint(p)) quotation.append(element('p', 'Draft quotation — subject to admin approval.', 'payment-note'));
+  letter.append(quotation);
   if (canPrint(p)) {
     const sign = element('p', undefined, 'letter-sign'); sign.append(document.createTextNode('Yours faithfully,\n'), element('strong', p.signatory_name), document.createTextNode('\n' + p.signatory_title)); sign.style.whiteSpace = 'pre-line'; letter.append(sign);
   } else letter.append(element('p', 'Signatory and any quoted amount are confirmed during admin approval.', 'small'));
-  letter.append(element('p', 'muaglobalinnovation.com · +234 706 874 4549 · +234 802 506 3991', 'letter-footer'));
+  letter.append(element('p', 'MUA Global Innovation Ltd • Building practical digital solutions', 'letter-footer'));
   return letter;
 }
 async function openDetail(id) {

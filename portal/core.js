@@ -9,5 +9,13 @@ export function validateBrief(data) {
 export function canEdit(proposal) { return ['draft', 'changes_requested'].includes(proposal.status); }
 export function canPrint(proposal) { return proposal.status === 'approved'; }
 export function money(amount) { return amount == null ? 'To be agreed' : new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount); }
+export function paymentBreakdown(amount) {
+  if (amount == null || amount === '') return null;
+  const total = Number(amount);
+  if (!Number.isFinite(total) || total < 0) return null;
+  const totalKobo = Math.round(total * 100);
+  const depositKobo = Math.round(totalKobo * 0.6);
+  return { total: totalKobo / 100, deposit: depositKobo / 100, balance: (totalKobo - depositKobo) / 100 };
+}
 export function date(value) { return new Intl.DateTimeFormat('en-NG', { dateStyle: 'long' }).format(new Date(value)); }
 export function reference(value) { return value || 'Assigned when saved'; }
