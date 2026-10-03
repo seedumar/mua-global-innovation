@@ -1,5 +1,5 @@
 import { PortalAPI } from './api.js?v=20261003-commission';
-import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance, projectStatuses, projectOverdue, projectBalance, validateProject, receiptAvailable, validateReceipt, commissionEligible } from './core.js?v=20261003-commission';
+import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance, projectStatuses, projectOverdue, projectBalance, validateProject, receiptAvailable, validateReceipt, commissionEligible, projectWorkFee } from './core.js?v=20261003-fees';
 const api = new PortalAPI(window.MUA_PORTAL_CONFIG || {});
 const $ = selector => document.querySelector(selector);
 let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '', projects = [], projectError = '', billingProject, billingDocuments = [], commissions = [], commissionError = '';
@@ -125,21 +125,24 @@ function renderProjects() {
     const deadline = element('td',project.deadline ? date(project.deadline+'T12:00:00+01:00') : 'Not set');
     if (projectOverdue(project)) deadline.append(element('span','Overdue','badge follow-up-due'));
     const amounts = element('td'); amounts.append(element('div','Cost: '+money(project.total_cost)),element('div','Received: '+money(project.amount_received)),element('strong','Balance: '+money(projectBalance(project.total_cost,project.amount_received))));
+    const work=projectWorkFee(project.total_cost,project.domain_fee,project.hosting_fee); amounts.append(element('div',work == null ? 'Work fee: not recorded' : 'Work fee: '+money(work)));
     const actions = element('td'); actions.append(button('View / Update',()=>openProjectEditor(project)),button('Invoices / Receipts',()=>openBilling(project.id)),button('Commission',()=>openCommissionEditor(project.id))); row.append(client,element('td',project.assigned_to || 'Unassigned'),statusCell,deadline,amounts,actions); labelRow(row, ['Client & service','Assigned to','Progress','Deadline','Cost / received / balance','Action']); list.append(row);
   }
 }
 function updateProjectPaymentSummary() {
   const form = $('#delivery-form'), summary = $('#project-payment-summary'), total = form.elements.total_cost.value, received = form.elements.amount_received.value;
   if (total === '' || received === '') { summary.textContent = 'Enter the project cost and confirmed payments to calculate the balance.'; return; }
+  const domain=form.elements.domain_fee.value, hosting=form.elements.hosting_fee.value, work=projectWorkFee(total,domain,hosting);
+  const fees=domain === '' && hosting === '' ? ' · Work fee: not recorded' : work == null ? ' · Enter both fees; their sum must not exceed the cost.' : ' · Work fee after domain / hosting: '+money(work);
   const breakdown = paymentBreakdown(total), balance = projectBalance(total,received);
-  summary.textContent = !breakdown || !Number.isFinite(balance) || Number(received)<0 || balance<0 ? 'Enter valid amounts. Confirmed payments must not exceed the cost.' : 'Expected deposit (60%): '+money(breakdown.deposit)+' · Confirmed received: '+money(received)+' · Outstanding: '+money(balance);
+  summary.textContent = !breakdown || !Number.isFinite(balance) || Number(received)<0 || balance<0 ? 'Enter valid amounts. Confirmed payments must not exceed the cost.' : 'Expected deposit (60%): '+money(breakdown.deposit)+' · Confirmed received: '+money(received)+' · Outstanding: '+money(balance)+fees;
 }
 function openProjectEditor(project, proposal) {
   if (!adminArea) return;
   if (projectError) { notify(projectError); return; }
   const form = $('#delivery-form'); form.reset(); form.querySelector('.form-message').textContent = '';
   $('#project-editor-title').textContent = project ? 'Update project delivery.' : 'Add a project.';
-  if (project) { for (const field of ['id','client_name','service_name','assigned_to','deadline','status','total_cost','amount_received','payment_notes','notes']) form.elements[field].value = project[field] ?? ''; form.elements.expected_updated_at.value = project.updated_at; }
+  if (project) { for (const field of ['id','client_name','service_name','assigned_to','deadline','status','total_cost','amount_received','domain_fee','hosting_fee','payment_notes','notes']) form.elements[field].value = project[field] ?? ''; form.elements.expected_updated_at.value = project.updated_at; }
   if (proposal) { form.elements.client_name.value = proposal.client_name; form.elements.service_name.value = proposal.service_name; form.elements.total_cost.value = proposal.amount ?? ''; form.elements.notes.value = 'Proposal reference: '+proposal.reference; }
   updateProjectPaymentSummary(); $('#project-dialog').showModal();
 }
@@ -206,9 +209,11 @@ function populateCommissionFields(){
 }
 function updateCommissionSummary(){
   const form=$('#commission-form'),project=projects.find(item=>item.id===form.elements.project_id.value),fixed=form.elements.fixed_amount.value;
-  if(!project || fixed===''){ $('#commission-summary').textContent='Choose a project and enter its fixed commission.';return; }
+  if(!project){ $('#commission-summary').textContent='Choose a project to review its work fee.';return; }
+  const work=projectWorkFee(project.total_cost,project.domain_fee,project.hosting_fee), costSummary=work == null ? 'Work fee not recorded. Add domain and hosting fees in Project delivery before agreeing a commission. ' : 'Domain: '+money(project.domain_fee)+' · Hosting: '+money(project.hosting_fee)+' · Work fee: '+money(work)+'. ';
+  if(fixed===''){ $('#commission-summary').textContent=costSummary+'Enter the agreed fixed commission.';return; }
   const eligible=commissionEligible(fixed,project.total_cost,project.amount_received,form.elements.approved.checked),first=Math.round(Number(fixed)*100*0.5)/100;
-  $('#commission-summary').textContent='First half: '+money(first)+' · Second half: '+money(projectBalance(fixed,first))+' · Payable now: '+money(eligible)+' · Unpaid payable balance: '+money(projectBalance(eligible,form.elements.paid_amount.value || 0));
+  $('#commission-summary').textContent=costSummary+(work != null && Number(fixed)>work ? 'Commission exceeds the work fee. Review the agreed amount. ' : '')+'First half: '+money(first)+' · Second half: '+money(projectBalance(fixed,first))+' · Payable now: '+money(eligible)+' · Unpaid payable balance: '+money(projectBalance(eligible,form.elements.paid_amount.value || 0));
 }
 function openCommissionEditor(projectId){
   if(!adminArea)return;if(commissionError || projectError){notify(commissionError || projectError);return;}
@@ -387,10 +392,10 @@ if (adminArea) {
   },form);});
   $('#new-project').addEventListener('click',()=>openProjectEditor());
   $('#project-search').addEventListener('input',renderProjects); $('#project-status-filter').addEventListener('change',renderProjects); $('#project-overdue-filter').addEventListener('change',renderProjects);
-  for (const field of ['total_cost','amount_received']) $('#delivery-form').elements[field].addEventListener('input',updateProjectPaymentSummary);
+  for (const field of ['total_cost','amount_received','domain_fee','hosting_fee']) $('#delivery-form').elements[field].addEventListener('input',updateProjectPaymentSummary);
   $('#delivery-form').addEventListener('submit',event=>{ event.preventDefault(); const form=event.currentTarget; action(async()=>{
     const data=validateProject(Object.fromEntries(new FormData(form)));
-    await api.rpc('portal_save_project',{p_id:data.id || null,p_expected_updated_at:data.expected_updated_at || null,p_client_name:data.client_name,p_service_name:data.service_name,p_assigned_to:data.assigned_to,p_deadline:data.deadline || null,p_status:data.status,p_total_cost:Number(data.total_cost),p_amount_received:Number(data.amount_received),p_payment_notes:data.payment_notes,p_notes:data.notes});
+    await api.rpc('portal_save_project_with_fees',{p_id:data.id || null,p_expected_updated_at:data.expected_updated_at || null,p_client_name:data.client_name,p_service_name:data.service_name,p_assigned_to:data.assigned_to,p_deadline:data.deadline || null,p_status:data.status,p_total_cost:Number(data.total_cost),p_domain_fee:data.domain_fee === '' ? null : Number(data.domain_fee),p_hosting_fee:data.hosting_fee === '' ? null : Number(data.hosting_fee),p_amount_received:Number(data.amount_received),p_payment_notes:data.payment_notes,p_notes:data.notes});
     $('#project-dialog').close(); await loadData(); showView('projects'); notify('Project delivery updated.');
   },form); });
 }

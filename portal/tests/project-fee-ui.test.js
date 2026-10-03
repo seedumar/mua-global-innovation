@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import { projectWorkFee, paymentBreakdown, projectBalance, money, commissionEligible } from '../core.js';
+const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+test('project and commission summaries display work fees before agreement',()=>{
+ const delivery={elements:Object.fromEntries(Object.entries({total_cost:'150000',amount_received:'90000',domain_fee:'10000',hosting_fee:'20000'}).map(([k,value])=>[k,{value}]))};
+ const commission={elements:{project_id:{value:'project'},fixed_amount:{value:''},approved:{checked:true},paid_amount:{value:'0'}}};
+ const paymentSummary={},commissionSummary={};
+ const nodes={'#delivery-form':delivery,'#project-payment-summary':paymentSummary,'#commission-form':commission,'#commission-summary':commissionSummary};
+ const context=vm.createContext({$:id=>nodes[id],projectWorkFee,paymentBreakdown,projectBalance,money,commissionEligible,projects:[{id:'project',total_cost:150000,amount_received:90000,domain_fee:10000,hosting_fee:20000}]});
+ for(const [name,next] of [['updateProjectPaymentSummary','openProjectEditor'],['updateCommissionSummary','openCommissionEditor']])vm.runInContext(source.slice(source.indexOf('function '+name+'('),source.indexOf('function '+next+'(')),context);
+ vm.runInContext('updateProjectPaymentSummary();updateCommissionSummary()',context);
+ assert(paymentSummary.textContent.includes(money(120000)));
+ assert(commissionSummary.textContent.includes(money(120000)));
+ assert(commissionSummary.textContent.includes('Enter the agreed fixed commission'));
+ commission.elements.fixed_amount.value='130000';vm.runInContext('updateCommissionSummary()',context);
+ assert(commissionSummary.textContent.includes('exceeds the work fee'));
+ delivery.elements.domain_fee.value='';delivery.elements.hosting_fee.value='';vm.runInContext('updateProjectPaymentSummary()',context);
+ assert(paymentSummary.textContent.includes('not recorded'));
+});

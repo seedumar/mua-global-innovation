@@ -18,6 +18,11 @@ export function leadDue(lead, today = lagosToday()) { return !!lead.follow_up_da
 export const projectStatuses = { not_started: 'Not started', in_progress: 'In progress', client_review: 'Client review', completed: 'Completed' };
 export function projectOverdue(project, today = lagosToday()) { return !!project.deadline && project.status !== 'completed' && project.deadline < today; }
 export function projectBalance(total, received) { return (Math.round(Number(total)*100)-Math.round(Number(received)*100))/100; }
+export function projectWorkFee(total, domain, hosting) {
+  if ([total,domain,hosting].some(value => value == null || value === '' || !Number.isFinite(Number(value)) || Number(value)<0 || Number(value)>999999999 || Math.abs(Number(value)*100-Math.round(Number(value)*100))>0.00001)) return null;
+  const kobo=Math.round(Number(total)*100)-Math.round(Number(domain)*100)-Math.round(Number(hosting)*100);
+  return kobo<0 ? null : kobo/100;
+}
 export function commissionEligible(fixed, total, received, approved = true) {
   const fee = Math.round(Number(fixed)*100), cost = Math.round(Number(total)*100), paid = Math.round(Number(received)*100);
   if (!approved || !Number.isFinite(fee) || !Number.isFinite(cost) || !Number.isFinite(paid) || fee<=0 || cost<=0) return 0;
@@ -43,6 +48,9 @@ export function validateProject(data) {
     if (data[field] == null || data[field] === '' || !Number.isFinite(Number(data[field])) || Number(data[field])<0 || Number(data[field])>999999999 || Math.abs(Number(data[field])*100-Math.round(Number(data[field])*100))>0.00001) throw new Error('Enter valid amounts in NGN with up to two decimal places.');
   }
   if (projectBalance(data.total_cost,data.amount_received)<0) throw new Error('Confirmed payments cannot exceed the project cost.');
+  if ((data.domain_fee != null && data.domain_fee !== '') || (data.hosting_fee != null && data.hosting_fee !== '')) {
+    if (projectWorkFee(data.total_cost,data.domain_fee,data.hosting_fee) == null) throw new Error('Enter both domain and hosting fees (use 0 when none). Their sum must not exceed the project cost.');
+  }
   if (data.deadline && (!/^\d{4}-\d{2}-\d{2}$/.test(data.deadline) || !Number.isFinite(Date.parse(data.deadline)) || new Date(data.deadline).toISOString().slice(0,10)!==data.deadline)) throw new Error('Choose a valid deadline.');
   return data;
 }

@@ -96,7 +96,7 @@ The ambassador application page includes a login link. Administrators sign in at
 4. Admin adjusts the letter, optionally enters a quoted amount, confirms the authorised signatory and approves it—or returns it with required revision notes.
 5. Ambassador can print the approved letter and choose **Save as PDF** in the browser print dialog.
 
-There is no automatic email to the recipient, no commission/payment tracking, and no uploaded signature image in this version. The signatory is a typed name/title controlled by admin approval. Approved letters are immutable through the portal API. To correct an approved letter, create and approve a new proposal and handle withdrawal of the old one through your operating process.
+There is no automatic email to the recipient, no automatic money transfers, and no uploaded signature image in this version. The signatory is a typed name/title controlled by admin approval. Approved letters are immutable through the portal API. To correct an approved letter, create and approve a new proposal and handle withdrawal of the old one through your operating process.
 
 ## Required live verification before launch
 
@@ -173,3 +173,13 @@ Optional live checks: run `backend/document-permission-tests.sql`; its data is r
 5. Ambassadors can read only their own approved commission records and payout notes. They cannot approve terms or record payouts. Existing admins retain all records, including commissions assigned to inactive ambassadors.
 
 Optional live verification: run `backend/commission-permission-tests.sql`; its test data rolls back. Local tests verify arithmetic and UI structure. Install and verify the database policies in your Supabase project before relying on access isolation.
+
+## Domain, hosting and work fees
+
+Run `backend/project-fees.sql` in the existing Supabase project after project-delivery.sql, then replace the portal folder and hard refresh. Do not rerun schema.sql.
+
+In Project delivery, enter the domain and hosting fees (0 for none), or leave both blank until known. Existing projects keep an unknown breakdown until an admin enters it. Work fee is calculated as total project cost minus domain and hosting fees. Combined fees cannot exceed the cost. Admin-only access and stale-edit protection also apply to these fields.
+
+The commission editor shows these costs before the admin enters an agreed fixed commission. This is a review aid, not a commission percentage or profit calculation: it does not deduct other expenses. Existing commissions and issued invoice/receipt snapshots remain unchanged. Client terms stay 60% deposit / 40% balance; the fixed commission becomes payable 50% after that deposit and 50% after full client payment.
+
+Optional live database checks: `backend/project-fee-permission-tests.sql` (test data rolls back).
