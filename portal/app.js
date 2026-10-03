@@ -13,7 +13,7 @@ async function action(work, form, button) {
   controls.forEach(control => { control.disabled = true; });
   try { await work(); } catch (error) {
     if (message) message.textContent = error.message; else notify(error.message);
-    if (!api.session) { profile = null; $('#workspace').hidden = true; $('#auth-screen').hidden = false; }
+    if (!api.session) { setMobileMenu(false); profile = null; $('#workspace').hidden = true; $('#auth-screen').hidden = false; }
   } finally { controls.forEach(control => { control.disabled = false; }); }
 }
 function button(text, callback, cls = 'outline') { const node = element('button', text, cls); node.type = 'button'; node.addEventListener('click', () => action(() => callback(node), null, node)); return node; }
@@ -23,7 +23,10 @@ function labelRow(row, labels) {
   [...row.children].forEach((cell, index) => { cell.setAttribute('role', 'cell'); cell.setAttribute('data-label', labels[index] || ''); });
 }
 function setMobileMenu(open, restoreFocus = false) {
-  $('#portal-sidebar').classList.toggle('mobile-open', open);
+  const drawer = $('#mobile-nav-dialog');
+  if (open && !drawer.open) drawer.showModal();
+  if (!open && drawer.open) drawer.close();
+  document.body.classList.toggle('menu-open', open);
   $('#mobile-menu-toggle').setAttribute('aria-expanded', String(open));
   $('#mobile-menu-toggle').textContent = open ? 'Close menu' : 'Menu';
   if (restoreFocus) $('#mobile-menu-toggle').focus();
@@ -222,6 +225,8 @@ async function openWorkspace() {
   $('#identity').textContent = `${profile.full_name || profile.email} · ${profile.role === 'admin' ? 'Administrator' : 'Ambassador'}`;
   $('#dashboard-kicker').textContent = adminArea ? 'MUA administration' : 'Your workspace';
   const other = $('#other-dashboard'); other.hidden = profile.role !== 'admin'; other.href = adminArea ? 'index.html' : 'admin.html'; other.textContent = adminArea ? 'Open ambassador workspace ↗' : 'Open admin dashboard ↗';
+  $('#drawer-identity').textContent = $('#identity').textContent;
+  const drawerOther = $('#drawer-other-dashboard'); drawerOther.hidden = other.hidden; drawerOther.href = other.href; drawerOther.textContent = other.textContent;
   showView('proposals');
 }
 function openEditor(proposal) {
@@ -309,6 +314,7 @@ async function reviewProposal(decision) {
   await api.rpc('portal_review_proposal', { p_id: current.id, p_decision: decision, p_feedback: data.get('feedback'), p_letter_text: data.get('letter_text'), p_amount: data.get('amount') === '' ? null : Number(data.get('amount')), p_signatory_name: data.get('signatory_name'), p_signatory_title: data.get('signatory_title') });
   await loadData(); await openDetail(current.id); notify(decision === 'approved' ? 'Proposal approved.' : 'Changes requested.');
 }
+$('#drawer-navigation').replaceChildren(...[...$('#portal-navigation').children].map(node => node.cloneNode(true)));
 $('#login-form').addEventListener('submit', event => { event.preventDefault(); const form = event.currentTarget; action(async () => { const data = new FormData(form); await api.signIn(data.get('email').trim(), data.get('password')); try { await openWorkspace(); } catch (error) { await api.signOut(); throw error; } form.reset(); }, form); });
 $('#forgot-password').addEventListener('click', () => action(async () => { const email = $('#login-form').elements.email; if (!email.reportValidity()) return; await api.recover(email.value.trim()); notify('If this email has an account, a password-reset link will be sent.'); }, $('#login-form')));
 $('#sign-out').addEventListener('click', () => action(async () => { await api.signOut(); location.reload(); }, null, $('#sign-out')));
@@ -340,7 +346,16 @@ if (adminArea) {
   },form); });
 }
 $('#mobile-menu-toggle').addEventListener('click', () => setMobileMenu($('#mobile-menu-toggle').getAttribute('aria-expanded') !== 'true'));
-$('#portal-sidebar').addEventListener('keydown', event => { if (event.key === 'Escape' && $('#mobile-menu-toggle').getAttribute('aria-expanded') === 'true') setMobileMenu(false, true); });
+$('#drawer-close').addEventListener('click', () => setMobileMenu(false, true));
+$('#drawer-sign-out').addEventListener('click', () => { setMobileMenu(false); $('#sign-out').click(); });
+$('#mobile-nav-dialog').addEventListener('cancel', event => { event.preventDefault(); setMobileMenu(false, true); });
+$('#mobile-nav-dialog').addEventListener('close', () => { document.body.classList.remove('menu-open'); $('#mobile-menu-toggle').setAttribute('aria-expanded', 'false'); $('#mobile-menu-toggle').textContent = 'Menu'; });
+$('#mobile-nav-dialog').addEventListener('click', event => {
+  if (event.target !== event.currentTarget) return;
+  const box = event.currentTarget.getBoundingClientRect();
+  if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) setMobileMenu(false, true);
+});
+window.matchMedia('(max-width:850px)').addEventListener('change', event => { if (!event.matches) setMobileMenu(false); });
 $('#new-lead').addEventListener('click', () => openLeadEditor());
 $('#lead-owner-filter').addEventListener('change', renderLeads);
 if (adminArea) { $('#performance-search').addEventListener('input', renderPerformance); $('#performance-access').addEventListener('change', renderPerformance); $('#performance-sort').addEventListener('change', renderPerformance); }
