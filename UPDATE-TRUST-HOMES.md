@@ -1,14 +1,13 @@
-# Live Trust Homes feature
+# Updated live Trust Homes preview
 
-Upload these four files to your existing GitHub website repository, replacing matching files:
+Replace these three files in your existing GitHub website repository:
 
 - index.html
 - ventures.html
-- assets/styles.css
 - assets/trust-homes-preview.jpg
 
-Keep the assets folder structure. Wait for GitHub Pages deployment, then refresh with Ctrl + Shift + R.
+Keep the assets folder structure. After GitHub Pages deploys, refresh with Ctrl + Shift + R. The image URL includes a new version value to avoid reusing the old cached preview.
 
-The home and Ventures pages feature MUA Trust Homes as a live MUA venture, with an actual homepage preview and a Visit MUA Trust Homes link. Preview and visit links open https://mua-trust-homes.vercel.app/ in a new tab.
+The home and Ventures pages now show the redesigned live Trust Homes homepage, with the contemporary house illustration and updated headline. Existing visit links remain unchanged.
 
-No Supabase SQL, Edge Function, SMTP or portal changes are required for this update. Enquiry form and portal code are preserved. The ZIP includes the full latest website. The screenshot is a snapshot; replace it when the Trust Homes design changes.
+No Supabase, SMTP, SQL, CSS or Edge Function changes are required for this preview refresh. The full ZIP includes the latest portal password minimum of 8 characters and all existing enquiry functionality.
