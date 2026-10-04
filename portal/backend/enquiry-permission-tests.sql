@@ -1,0 +1,67 @@
+-- Optional verification AFTER website-enquiries.sql. Test data always rolls back.
+begin;
+do $$
+declare adm uuid:=gen_random_uuid(); amb uuid:=gen_random_uuid(); eid uuid:=gen_random_uuid(); stamp timestamptz; visible integer; denied boolean; item integer;
+begin
+ insert into auth.users(id,email) values(adm,adm::text||'@enquiry-test.invalid'),(amb,amb::text||'@enquiry-test.invalid');
+ update public.portal_profiles set active=true where id in(adm,amb);
+ update public.portal_profiles set role='admin' where id=adm;
+ execute 'set local role service_role';
+ perform public.portal_receive_enquiry(eid,'Test client','client@example.invalid','Business website','Original brief','Test organisation','Within a month',repeat('a',64));
+ -- A retry returns the same record even if this contact has reached its limit.
+ perform public.portal_receive_enquiry(eid,'Test client','client@example.invalid','Business website','Original brief','Test organisation','Within a month',repeat('a',64));
+ if (select count(*) from public.portal_enquiries where id=eid)<>1 then raise exception 'FAIL: duplicate intake.'; end if;
+ denied:=false;
+ begin perform public.portal_receive_enquiry(eid,'Different client','client@example.invalid','Business website','Original brief','Test organisation','Within a month',repeat('a',64)); exception when others then if sqlerrm='enquiry_request_conflict' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: request identity overwritten.'; end if;
+ execute 'reset role';
+ perform set_config('request.jwt.claim.sub',adm::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',adm,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ select updated_at into stamp from public.portal_enquiries where id=eid;
+ if stamp is null then raise exception 'FAIL: active admin cannot read enquiry.'; end if;
+ perform public.portal_update_enquiry(eid,stamp,'contacted','Umar',current_date,'Call client');
+ denied:=false;
+ begin perform public.portal_update_enquiry(eid,stamp,'closed','Other',null,'Stale update'); exception when others then if sqlerrm like 'This enquiry changed%' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: stale update accepted.'; end if;
+ denied:=false;
+ begin update public.portal_enquiries set details='Overwritten' where id=eid; exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'FAIL: original brief editable through table API.'; end if;
+ denied:=false;
+ begin perform public.portal_receive_enquiry(gen_random_uuid(),'Client','client@example.invalid','Website','Brief','','',repeat('a',64)); exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'FAIL: authenticated client called privileged intake.'; end if;
+ execute 'reset role';
+ perform set_config('request.jwt.claim.sub',amb::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',amb,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ select count(*) into visible from public.portal_enquiries where id=eid;
+ if visible<>0 then raise exception 'FAIL: ambassador read private enquiry.'; end if;
+ denied:=false;
+ begin perform public.portal_update_enquiry(eid,stamp,'won','Ambassador',null,''); exception when others then if sqlerrm='Admin access required' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: ambassador updated enquiry.'; end if;
+ execute 'reset role';
+ update public.portal_profiles set active=false where id=adm;
+ perform set_config('request.jwt.claim.sub',adm::text,true);
+ perform set_config('request.jwt.claims',json_build_object('sub',adm,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ select count(*) into visible from public.portal_enquiries where id=eid;
+ if visible<>0 then raise exception 'FAIL: inactive admin read enquiry.'; end if;
+ execute 'reset role';
+ execute 'set local role anon';
+ denied:=false;
+ begin perform public.portal_receive_enquiry(gen_random_uuid(),'Client','client@example.invalid','Website','Brief','','',repeat('a',64)); exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'FAIL: anonymous privileged intake.'; end if;
+ denied:=false;
+ begin perform count(*) from public.portal_enquiries; exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'FAIL: anonymous read access.'; end if;
+ execute 'reset role';
+ -- Isolate rolling-rate checks from real traffic; the whole transaction rolls back.
+ delete from portal_private.enquiry_intake_log;
+ execute 'set local role service_role';
+ for item in 1..5 loop perform public.portal_receive_enquiry(gen_random_uuid(),'Rate test','rate@example.invalid','Website','Brief','','',repeat('b',64)); end loop;
+ denied:=false;
+ begin perform public.portal_receive_enquiry(gen_random_uuid(),'Rate test','rate@example.invalid','Website','Brief','','',repeat('b',64)); exception when others then if sqlerrm='enquiry_rate_limit' then denied:=true; else raise; end if; end;
+ if not denied then raise exception 'FAIL: per-contact rate limit bypassed.'; end if;
+ execute 'reset role';
+end $$;
+rollback;
