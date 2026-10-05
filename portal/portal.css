@@ -15,5 +15,3 @@
 #project-list td:last-child button{display:block;margin:4px 0}#document-preview .quotation-table th{width:58%}#document-preview .quotation-table td{width:42%;overflow-wrap:anywhere}
 
 #commission-stats .stat strong{font-size:clamp(1rem,1.7vw,1.6rem);overflow-wrap:anywhere}#commission-list small{display:block}#commission-list td{max-width:300px;overflow-wrap:anywhere}
-
-.enquiry-brief{background:#f4f7fa;padding:20px;border-radius:12px;max-height:340px;overflow:auto}.enquiry-brief dt{font-weight:700;margin-top:12px}.enquiry-brief dt:first-child{margin-top:0}.enquiry-brief dd{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}

@@ -27,7 +27,7 @@ const observer=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(ent
 sections.forEach(section=>observer.observe(section));
 }
 
-document.querySelector('#contact-form:not(.project-wizard)')?.addEventListener('submit',event=>{
+document.querySelector('#contact-form')?.addEventListener('submit',event=>{
   event.preventDefault();
   const data=new FormData(event.currentTarget);
   const extra = [...event.currentTarget.querySelectorAll('[data-question]')].filter(field=>field.value&&(!['checkbox','radio'].includes(field.type)||field.checked)).map(field=>`${field.dataset.question} ${field.value}`).join('\n');

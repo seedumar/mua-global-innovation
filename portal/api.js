@@ -50,13 +50,6 @@ export class PortalAPI {
     const user = await this.user();
     return (await this.request('/rest/v1/portal_profiles?id=eq.' + encodeURIComponent(user.id) + '&select=*'))[0];
   }
-  async enquiries() {
-    const rows=[];
-    for(let offset=0;;offset+=500){
-      const page=await this.request('/rest/v1/portal_enquiries?select=*&order=created_at.desc,id&limit=500&offset='+offset);
-      rows.push(...page);if(page.length<500)return rows;
-    }
-  }
   rpc(name, args) { return this.request('/rest/v1/rpc/' + name, { method: 'POST', body: args }); }
   proposals() { return this.request('/rest/v1/portal_proposals?select=*&order=updated_at.desc'); }
   leads() { return this.request('/rest/v1/portal_leads?select=*&order=updated_at.desc'); }

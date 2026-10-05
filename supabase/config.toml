@@ -1,0 +1,2 @@
+[functions.ambassador-apply]
+verify_jwt = false
