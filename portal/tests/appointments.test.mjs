@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {todayLagos,letterDate,appointmentText,appointmentArgs} from '../appointments-core.mjs';
+test('Nigeria midnight is used for the default appointment date',()=>{assert.equal(todayLagos(new Date('2026-10-10T23:30:00Z')),'2026-10-11')});
+test('impossible dates cannot be issued',()=>{assert.throws(()=>letterDate('2026-02-30'));assert.throws(()=>letterDate('not a date'));assert.match(letterDate('2028-02-29'),/29.*February.*2028/)});
+test('only accepted applicants can prepare an issue request',()=>{for(const status of ['new','shortlisted','declined'])assert.throws(()=>appointmentArgs({id:'a',status},'2026-10-10',appointmentText('2026-10-10')))});
+test('request preserves reviewed wording, identity and date',()=>{const text=appointmentText('2026-10-10');assert.deepEqual(appointmentArgs({id:'a',status:'accepted'},'2026-10-10',' '+text+' '),{p_application_id:'a',p_effective_date:'2026-10-10',p_letter_text:text});assert.match(text,/fixed commission amount/);assert.match(text,/50% becomes payable/);assert.match(text,/remaining 50%/);assert.doesNotMatch(text,/60%|salary of|10%/)});
+test('empty and oversized appointment wording is rejected',()=>{assert.throws(()=>appointmentArgs({id:'a',status:'accepted'},'2026-10-10','short'));assert.throws(()=>appointmentArgs({id:'a',status:'accepted'},'2026-10-10','x'.repeat(12001)))});

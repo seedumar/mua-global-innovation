@@ -1,9 +1,11 @@
-import { PortalAPI } from './api.js?v=20261003-commission';
+import { createEnquiryInbox } from './enquiries.js?v=20261004-inbox';
+import { PortalAPI } from './api.js?v=20261010-checked';
 import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance, projectStatuses, projectOverdue, projectBalance, validateProject, receiptAvailable, validateReceipt, commissionEligible, projectWorkFee } from './core.js?v=20261003-fees';
 const api = new PortalAPI(window.MUA_PORTAL_CONFIG || {});
 const $ = selector => document.querySelector(selector);
 let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '', projects = [], projectError = '', billingProject, billingDocuments = [], commissions = [], commissionError = '';
 const adminArea = document.body.dataset.area === 'admin';
+const enquiryInbox = adminArea ? createEnquiryInbox(api,{element,button,labelRow,action,date,lagosToday,notify}) : null;
 function element(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
 function notify(message) { clearTimeout(noticeTimer); $('#notice').textContent = message; $('#notice').hidden = false; noticeTimer = setTimeout(() => { $('#notice').hidden = true; }, 6500); }
 async function action(work, form, button) {
@@ -34,9 +36,9 @@ function setMobileMenu(open, restoreFocus = false) {
 function showView(name) {
   if (!adminArea && !['proposals','leads','commissions'].includes(name)) return;
   setMobileMenu(false);
-  ['proposals', 'leads', 'members', 'services', 'performance', 'projects', 'commissions'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
+  ['proposals', 'leads', 'members', 'services', 'performance', 'projects', 'commissions', 'enquiries'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
   document.querySelectorAll('[data-view]').forEach(node => { node.classList.toggle('active', node.dataset.view === name); if (node.dataset.view === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
-  $('#dashboard-title').textContent = name === 'commissions' ? 'Ambassador commissions.' : name === 'projects' ? 'Project delivery.' : name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
+  $('#dashboard-title').textContent = name === 'enquiries' ? 'Website enquiries.' : name === 'commissions' ? 'Ambassador commissions.' : name === 'projects' ? 'Project delivery.' : name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
 }
 function renderProposals() {
   const stats = $('#stats'); stats.replaceChildren();
@@ -257,7 +259,7 @@ async function loadData() {
   }
   renderLeads(); renderProposals(); if (adminArea) { renderMembers(); renderServices(); renderPerformance();
     try { projects = await api.projects(); projectError = ''; } catch (error) { projects = []; projectError = 'Project delivery is unavailable. If this is your first update, run project-delivery.sql in Supabase and refresh. Otherwise, check your connection and retry.'; }
-    renderProjects(); }
+    renderProjects(); await enquiryInbox.load(); }
   try { commissions = await api.commissions(); commissionError = ''; } catch (error) { commissions = []; commissionError = 'Commission tracking is unavailable. For the first update, ask the admin to run commissions.sql in Supabase, then refresh. Otherwise, check your connection and retry.'; }
   if (!adminArea) commissions = commissions.filter(c => c.ambassador_id === profile.id);
   renderCommissions();

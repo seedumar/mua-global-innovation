@@ -1,2 +1,8 @@
+# Public intake functions validate submissions themselves.
 [functions.ambassador-apply]
+verify_jwt = false
+[functions.submit-enquiry]
+verify_jwt = false
+# This function checks the supplied JWT with Supabase Auth and requires an active admin.
+[functions.invite-ambassador]
 verify_jwt = false

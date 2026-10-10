@@ -23,7 +23,7 @@
       rel="stylesheet"
     />
     <link rel="icon" type="image/png" href="assets/mua-logo-shield.png" />
-    <link rel="stylesheet" href="assets/styles.css?v=20261002-usability" />
+    <link rel="stylesheet" href="assets/styles.css?v=20261010-checked" />
     <link rel="stylesheet" href="assets/ambassador.css?v=20260929" />
     <link rel="stylesheet" href="assets/interactive.css?v=20260930-home" />
     <meta property="og:site_name" content="MUA Global Innovation Ltd" />
@@ -127,10 +127,10 @@
             <ol class="project-progress" aria-label="Enquiry steps" hidden><li data-progress="0">1. Service</li><li data-progress="1">2. Project</li><li data-progress="2">3. Contact</li></ol>
             <p class="wizard-status" role="status" aria-live="polite"></p>
             <fieldset data-project-step="0"><legend>What can we help you with?</legend><p class="step-intro">Choose the service that best matches your needs.</p><label>Service<select name="service" required><option value="" disabled selected>Select a service</option><option>School website</option><option>Business website</option><option>Organisation website</option><option>Software development</option><option>Networking</option><option>IT Training</option><option>CCTV Installation</option><option>Solar Installation</option><option>Product strategy and design</option><option>Digital transformation</option><option>MUA Trust Homes</option><option>Partnership or investment</option><option>Something else</option></select></label></fieldset>
-            <fieldset data-project-step="1"><legend>Tell us about your project.</legend><p class="step-intro">What should change or improve when this project is finished?</p><label>Project details<textarea name="message" rows="5" required placeholder="Describe your goal, location and any features or equipment you need."></textarea></label><label>Preferred timing (optional)<select name="timing" data-question="Preferred timing:"><option value="">Select if known</option><option>As soon as practical</option><option>Within a month</option><option>Within three months</option><option>Exploring options</option></select></label></fieldset>
-            <fieldset data-project-step="2"><legend>How can we reach you?</legend><p class="step-intro">Add your details so we can follow up on your enquiry.</p><label>Full name<input name="name" type="text" autocomplete="name" required placeholder="Your name" /></label><label>Phone or email<input name="contact" type="text" required placeholder="Your phone number or email" /></label><label>Organisation (optional)<input name="organisation" data-question="Organisation:" type="text" autocomplete="organization" placeholder="School, business or organisation name" /></label><div class="project-review" hidden><h3>Your enquiry</h3><p data-review></p><small>You can go back to change any answer before continuing.</small></div><button class="button button-primary full" type="submit">Prepare WhatsApp enquiry ↗</button><p class="form-note" id="form-note">WhatsApp opens with your message prepared. Review it and tap send there to complete your enquiry.</p></fieldset>
+            <fieldset data-project-step="1"><legend>Tell us about your project.</legend><p class="step-intro">What should change or improve when this project is finished?</p><label>Project details<textarea name="message" maxlength="5000" rows="5" required placeholder="Describe your goal, location and any features or equipment you need."></textarea></label><label>Preferred timing (optional)<select name="timing" data-question="Preferred timing:"><option value="">Select if known</option><option>As soon as practical</option><option>Within a month</option><option>Within three months</option><option>Exploring options</option></select></label></fieldset>
+            <fieldset data-project-step="2"><legend>How can we reach you?</legend><p class="step-intro">Add your details so we can follow up on your enquiry.</p><label>Full name<input name="name" maxlength="200" type="text" autocomplete="name" required placeholder="Your name" /></label><label>Phone or email<input name="contact" maxlength="254" type="text" required placeholder="Your phone number or email" /></label><label>Organisation (optional)<input name="organisation" maxlength="200" data-question="Organisation:" type="text" autocomplete="organization" placeholder="School, business or organisation name" /></label><label class="enquiry-trap" aria-hidden="true">Leave this field empty<input name="website" type="text" tabindex="-1" autocomplete="off" maxlength="200"></label><div class="project-review" hidden><h3>Your enquiry</h3><p data-review></p><small>You can go back to change any answer before continuing.</small></div><button class="button button-primary full" type="submit">Send enquiry →</button><p class="form-note" id="form-note" role="status" aria-live="polite">We use these details to respond to your enquiry. Please avoid sharing passwords, bank details or other sensitive information.</p></fieldset>
             <div class="wizard-actions" hidden><button type="button" class="wizard-back">Back</button><button type="button" class="button button-primary wizard-next">Continue →</button></div>
-            <noscript><p class="form-note">JavaScript is needed to prepare your message. You can also contact MUA using the phone or WhatsApp links on this page.</p></noscript>
+            <noscript><p class="form-note">JavaScript is needed to submit this form. You can also contact MUA using the phone or WhatsApp links on this page.</p></noscript>
           </form>
         </div>
       </section>
@@ -200,8 +200,10 @@
         ><a href="#main">Back to top ↑</a>
       </div>
     </footer>
-    <script src="assets/script.js?v=20261002-usability"></script>
+    <script src="assets/script.js?v=20261010-checked"></script>
     <script src="assets/interactive.js?v=20260930-ventures"></script>
     <script src="assets/project.js?v=20260930-1"></script>
-  </body>
+  <script src="portal/config.js?v=20261010-checked"></script>
+<script type="module" src="assets/enquiry.js?v=20261010-checked"></script>
+</body>
 </html>

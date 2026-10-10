@@ -50,15 +50,24 @@ export class PortalAPI {
     const user = await this.user();
     return (await this.request('/rest/v1/portal_profiles?id=eq.' + encodeURIComponent(user.id) + '&select=*'))[0];
   }
+  async rows(path) {
+    const rows=[];
+    for(let offset=0;;offset+=500){
+      const page=await this.request(path+'&limit=500&offset='+offset);
+      if(!Array.isArray(page))throw new Error('The dashboard received an invalid response. Please refresh.');
+      rows.push(...page);if(page.length<500)return rows;
+    }
+  }
+  enquiries() { return this.rows('/rest/v1/portal_enquiries?select=*&order=created_at.desc,id.asc'); }
   rpc(name, args) { return this.request('/rest/v1/rpc/' + name, { method: 'POST', body: args }); }
-  proposals() { return this.request('/rest/v1/portal_proposals?select=*&order=updated_at.desc'); }
-  leads() { return this.request('/rest/v1/portal_leads?select=*&order=updated_at.desc'); }
-  projects() { return this.request('/rest/v1/portal_projects?select=*&order=updated_at.desc'); }
-  documents() { return this.request('/rest/v1/portal_documents?select=*&order=issued_at.desc'); }
-  commissions() { return this.request('/rest/v1/portal_commissions?select=*&order=updated_at.desc'); }
-  services() { return this.request('/rest/v1/portal_services?select=*&order=name.asc'); }
-  profiles() { return this.request('/rest/v1/portal_profiles?select=*&order=created_at.desc'); }
-  events(id) { return this.request('/rest/v1/portal_events?proposal_id=eq.' + encodeURIComponent(id) + '&select=*&order=created_at.asc'); }
+  proposals() { return this.rows('/rest/v1/portal_proposals?select=*&order=updated_at.desc,id.asc'); }
+  leads() { return this.rows('/rest/v1/portal_leads?select=*&order=updated_at.desc,id.asc'); }
+  projects() { return this.rows('/rest/v1/portal_projects?select=*&order=updated_at.desc,id.asc'); }
+  documents() { return this.rows('/rest/v1/portal_documents?select=*&order=issued_at.desc,id.asc'); }
+  commissions() { return this.rows('/rest/v1/portal_commissions?select=*&order=updated_at.desc,id.asc'); }
+  services() { return this.rows('/rest/v1/portal_services?select=*&order=name.asc,id.asc'); }
+  profiles() { return this.rows('/rest/v1/portal_profiles?select=*&order=created_at.desc,id.asc'); }
+  events(id) { return this.rows('/rest/v1/portal_events?proposal_id=eq.' + encodeURIComponent(id) + '&select=*&order=created_at.asc,id.asc'); }
   recover(email) { return this.request('/auth/v1/recover?redirect_to=' + encodeURIComponent(new URL('./index.html', location.href).href), { method: 'POST', auth: false, body: { email } }); }
   setPassword(password) { return this.request('/auth/v1/user', { method: 'PUT', body: { password } }); }
   invite(email, full_name) { return this.request('/functions/v1/invite-ambassador', { method: 'POST', body: { email, full_name } }); }

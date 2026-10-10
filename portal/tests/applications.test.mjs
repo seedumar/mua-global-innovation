@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {applicationQuery,reviewArgs} from '../applications-core.mjs';
+test('decision includes the expected record version and trims notes',()=>{assert.deepEqual(reviewArgs({id:'abc',review_version:3},'accepted',' ready '),{p_id:'abc',p_status:'accepted',p_notes:'ready',p_expected_version:3})});
+test('invalid decisions and missing migration are rejected',()=>{assert.throws(()=>reviewArgs({id:'abc',review_version:0},'admin',''));assert.throws(()=>reviewArgs({id:'abc'},'new',''));assert.throws(()=>reviewArgs({id:'abc',review_version:0},'new','x'.repeat(5001)))});
+test('pages request one extra row and preserve filter values',()=>{const q=new URL('https://example.com'+applicationQuery({page:2,status:'shortlisted',state:'FCT Abuja'})).searchParams;assert.equal(q.get('limit'),'13');assert.equal(q.get('offset'),'24');assert.equal(q.get('status'),'eq.shortlisted');assert.equal(q.get('state'),'eq.FCT Abuja')});
+test('search cannot inject PostgREST filter operators',()=>{const q=new URL('https://example.com'+applicationQuery({search:'Umar),status.eq.accepted,*'})).searchParams;assert.equal(q.get('or'),'(full_name.ilike.*Umarstatus.eq.accepted*,email.ilike.*Umarstatus.eq.accepted*,reference.ilike.*Umarstatus.eq.accepted*)')});
