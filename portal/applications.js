@@ -1,6 +1,8 @@
 import {PortalAPI} from './api.js';
 import {createAppointments} from './appointments.js?v=20261010';
 import {statuses,reviewArgs,applicationQuery} from './applications-core.mjs';
+const embedded=window.self!==window.top&&new URLSearchParams(location.search).get('embedded')==='1';
+if(embedded)document.body.classList.add('embedded-review');
 const api=new PortalAPI(window.MUA_PORTAL_CONFIG||{}), $=s=>document.querySelector(s);
 const appointments=createAppointments(api);
 let page=0,current=null,request=0,detailRequest=0;
@@ -18,6 +20,6 @@ $('#appointment-open').onclick=()=>{if(current)appointments.open(current)};
 $('#close').onclick=()=>{$('#detail').close();detailRequest++;current=null};
 $('#detail').addEventListener('cancel',e=>{if($('#close').disabled)e.preventDefault();else{detailRequest++;current=null}});
 $('#login').onsubmit=async e=>{e.preventDefault();const b=$('#login button');b.disabled=true;try{await api.signIn(e.target.elements.email.value,e.target.elements.password.value);await access();await Promise.all([load(),stats()]);e.target.reset();}catch(e){message(e.message)}finally{b.disabled=false}};
-$('#signout').onclick=async()=>{appointments.clear();try{await api.signOut()}catch{}request++;detailRequest++;current=null;$('#detail').close();$('#list').replaceChildren();$('#brief').replaceChildren();$('#history').replaceChildren();$('#review').hidden=true;$('#gate').hidden=false;message('Signed out.');};
+$('#signout').onclick=async()=>{appointments.clear();try{await api.signOut()}catch{}request++;detailRequest++;current=null;$('#detail').close();$('#list').replaceChildren();$('#brief').replaceChildren();$('#history').replaceChildren();$('#review').hidden=true;$('#gate').hidden=false;message('Signed out.');if(embedded)window.parent.postMessage({type:'mua-review-signout'},location.origin);};
 let timer;$('#search').oninput=()=>{clearTimeout(timer);timer=setTimeout(()=>{page=0;load()},300)};for(const s of ['#status','#state'])$(s).onchange=()=>{page=0;load()};$('#previous').onclick=()=>{page--;load()};$('#next').onclick=()=>{page++;load()};$('#refresh').onclick=()=>Promise.all([load(),stats()]).catch(e=>message(e.message));
 if(api.session)(async()=>{try{await access();await Promise.all([load(),stats()])}catch(e){message(e.message)}})();
