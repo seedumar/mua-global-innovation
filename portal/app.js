@@ -266,6 +266,10 @@ async function loadData() {
 }
 async function openWorkspace() {
   await loadData();
+  if (profile.role === 'ambassador') {
+    try { await api.rpc('mua_mark_portal_sign_in', {}); }
+    catch { notify('Your workspace is available, but onboarding sign-in tracking could not be updated. Please tell the administrator.'); }
+  }
   $('#auth-screen').hidden = true; $('#workspace').hidden = false;
   document.querySelectorAll('.admin-only').forEach(node => { node.hidden = !adminArea; });
   $('#identity').textContent = `${profile.full_name || profile.email} · ${profile.role === 'admin' ? 'Administrator' : 'Ambassador'}`;
