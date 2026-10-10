@@ -1,3 +1,4 @@
+import { createWelcomePack } from './welcome.js?v=20261011-welcome';
 import { createEnquiryInbox } from './enquiries.js?v=20261004-inbox';
 import { PortalAPI } from './api.js?v=20261010-checked';
 import { statuses, validateBrief, canEdit, canPrint, money, paymentBreakdown, date, reference, leadStages, validateLead, lagosToday, leadDue, ambassadorPerformance, projectStatuses, projectOverdue, projectBalance, validateProject, receiptAvailable, validateReceipt, commissionEligible, projectWorkFee } from './core.js?v=20261003-fees';
@@ -6,6 +7,7 @@ const $ = selector => document.querySelector(selector);
 let profile, proposals = [], services = [], members = [], current, noticeTimer, leads = [], leadError = '', projects = [], projectError = '', billingProject, billingDocuments = [], commissions = [], commissionError = '';
 const adminArea = document.body.dataset.area === 'admin';
 const enquiryInbox = adminArea ? createEnquiryInbox(api,{element,button,labelRow,action,date,lagosToday,notify}) : null;
+const welcomePack = !adminArea ? createWelcomePack({element,showView,openLead:()=>openLeadEditor(),openProposal:()=>openEditor()}) : null;
 function element(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
 function notify(message) { clearTimeout(noticeTimer); $('#notice').textContent = message; $('#notice').hidden = false; noticeTimer = setTimeout(() => { $('#notice').hidden = true; }, 6500); }
 async function action(work, form, button) {
@@ -34,11 +36,12 @@ function setMobileMenu(open, restoreFocus = false) {
   if (restoreFocus) $('#mobile-menu-toggle').focus();
 }
 function showView(name) {
-  if (!adminArea && !['proposals','leads','commissions'].includes(name)) return;
+  if (name === 'welcome' && (adminArea || profile?.role !== 'ambassador')) return;
+  if (!adminArea && !['welcome','proposals','leads','commissions'].includes(name)) return;
   setMobileMenu(false);
-  ['proposals', 'leads', 'members', 'services', 'performance', 'projects', 'commissions', 'enquiries'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
+  ['welcome', 'proposals', 'leads', 'members', 'services', 'performance', 'projects', 'commissions', 'enquiries'].forEach(view => { const section = $('#' + view + '-view'); if (section) section.hidden = view !== name; });
   document.querySelectorAll('[data-view]').forEach(node => { node.classList.toggle('active', node.dataset.view === name); if (node.dataset.view === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current'); });
-  $('#dashboard-title').textContent = name === 'enquiries' ? 'Website enquiries.' : name === 'commissions' ? 'Ambassador commissions.' : name === 'projects' ? 'Project delivery.' : name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
+  $('#dashboard-title').textContent = name === 'welcome' ? 'Your MUA welcome pack.' : name === 'enquiries' ? 'Website enquiries.' : name === 'commissions' ? 'Ambassador commissions.' : name === 'projects' ? 'Project delivery.' : name === 'performance' ? 'Ambassador performance.' : name === 'leads' ? (adminArea ? 'All client outreach.' : 'Your client outreach.') : name === 'members' ? 'Your ambassador network.' : name === 'services' ? 'A consistent proposal standard.' : adminArea ? 'All proposals.' : 'Your proposals.';
 }
 function renderProposals() {
   const stats = $('#stats'); stats.replaceChildren();
@@ -263,6 +266,7 @@ async function loadData() {
   try { commissions = await api.commissions(); commissionError = ''; } catch (error) { commissions = []; commissionError = 'Commission tracking is unavailable. For the first update, ask the admin to run commissions.sql in Supabase, then refresh. Otherwise, check your connection and retry.'; }
   if (!adminArea) commissions = commissions.filter(c => c.ambassador_id === profile.id);
   renderCommissions();
+  welcomePack?.render(profile,leads,proposals,services,leadError);
 }
 async function openWorkspace() {
   await loadData();
@@ -277,7 +281,7 @@ async function openWorkspace() {
   const other = $('#other-dashboard'); other.hidden = profile.role !== 'admin'; other.href = adminArea ? 'index.html' : 'admin.html'; other.textContent = adminArea ? 'Open ambassador workspace ↗' : 'Open admin dashboard ↗';
   $('#drawer-identity').textContent = $('#identity').textContent;
   const drawerOther = $('#drawer-other-dashboard'); drawerOther.hidden = other.hidden; drawerOther.href = other.href; drawerOther.textContent = other.textContent;
-  showView('proposals');
+  showView(!adminArea && profile.role === 'ambassador' ? 'welcome' : 'proposals');
 }
 function openEditor(proposal) {
   const form = $('#proposal-form'); form.reset(); form.querySelector('.form-message').textContent = '';
